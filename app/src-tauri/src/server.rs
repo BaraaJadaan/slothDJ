@@ -90,14 +90,14 @@ fn handle(app: &AppHandle, port: u16, mut req: Request) {
                 let e = lock(&st.engine);
                 (e.info.ready, e.info.ytdlp_version.clone())
             };
-            let formats: Vec<Value> = FORMATS.iter().map(|(id, label)| json!({ "id": id, "label": label })).collect();
             reply(req, 200, json!({
                 "app": "slothDJ",
                 "version": env!("CARGO_PKG_VERSION"),
                 "ready": ready,
                 "engine": version,
                 "defaultFormat": lock(&st.settings).format,
-                "formats": formats,
+                "formats": FORMATS,
+                "sites": ["soundcloud", "youtube"],
             }))
         }
 

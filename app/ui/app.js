@@ -10,6 +10,7 @@ const REPO = 'https://github.com/BaraaJadaan/slothDJ';
 // ---------- Icons (Lucide, ISC license) ----------
 const ICONS = {
   link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
   sliders: '<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
@@ -21,9 +22,11 @@ const ICONS = {
   trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  film: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18M17 3v18M3 7.5h4M3 12h18M3 16.5h4M17 7.5h4M17 16.5h4"/>',
   clipboard: '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>',
   chevron: '<path d="m6 9 6 6 6-6"/>',
   external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  sparkle: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   puzzle: '<path d="M19.44 7.85c-.05.32.06.65.29.88l1.57 1.57c.47.47.7 1.09.7 1.7s-.23 1.23-.7 1.7l-1.61 1.61a.98.98 0 0 1-.84.28c-.47-.07-.8-.48-.97-.93a2.5 2.5 0 1 0-3.21 3.21c.45.17.86.5.93.97a.98.98 0 0 1-.28.84l-1.61 1.61a2.4 2.4 0 0 1-1.7.7 2.4 2.4 0 0 1-1.7-.7l-1.57-1.57a1.03 1.03 0 0 0-.88-.29c-.49.07-.84.5-1.02.97a2.5 2.5 0 1 1-3.24-3.24c.46-.18.9-.53.97-1.02a1.03 1.03 0 0 0-.29-.88L2.7 13.7A2.4 2.4 0 0 1 2 12c0-.62.24-1.23.7-1.7L4.23 8.77c.24-.24.58-.35.92-.3.51.08.88.53 1.07 1.01a2.5 2.5 0 1 0 3.26-3.26c-.48-.2-.93-.56-1.01-1.07-.05-.34.06-.68.3-.92L10.3 2.7A2.4 2.4 0 0 1 12 2c.62 0 1.23.24 1.7.7l1.57 1.57c.23.23.56.34.88.29.49-.07.84-.5 1.02-.97a2.5 2.5 0 1 1 3.24 3.24c-.46.18-.9.53-.97 1.02Z"/>',
 };
 const icon = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -33,26 +36,43 @@ function hydrateIcons(root = document) {
     el.setAttribute('data-icon-done', '');
   });
 }
+function setIcon(el, name) {
+  el.dataset.icon = name;
+  el.innerHTML = icon(name);
+}
 
 // ---------- Helpers ----------
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const RUNNING = ['starting', 'downloading', 'converting'];
 const FINISHED = ['done', 'failed', 'canceled'];
+const SITE_NAME = { soundcloud: 'SoundCloud', youtube: 'YouTube' };
 const fmtSpeed = (b) => (!b ? '' : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB/s` : `${Math.max(1, Math.round(b / 1024))} KB/s`);
 const fmtEta = (s) => {
   if (s == null || !isFinite(s) || s <= 0) return '';
   s = Math.round(s);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} left`;
 };
+const fmtDuration = (s) => {
+  if (!s) return '';
+  s = Math.round(s);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+};
 const prettyPath = (p) => {
   const sep = p.includes('\\') ? '\\' : '/';
   const parts = p.split(/[\\/]/).filter(Boolean);
   return parts.length > 2 ? `…${sep}${parts.slice(-2).join(sep)}` : p;
 };
+/** Is this text meant as a link (vs. a search)? */
+const looksLikeLink = (t) => !/\s/.test(t.trim()) && /^(https?:\/\/)?([\w-]+\.)+[a-z]{2,}(\/|$|\?)/i.test(t.trim());
 
-const state = { jobs: new Map(), settings: null, engine: {}, formats: [], filter: 'all', port: null };
-const formatLabel = (id) => state.formats.find((f) => f.id === id)?.label ?? id;
+const state = { jobs: new Map(), settings: null, engine: {}, formats: [], filter: 'all', port: null, linkSite: null, platform: '' };
+const formatInfo = (id) => state.formats.find((f) => f.id === id);
+const formatLabel = (id) => formatInfo(id)?.label ?? id;
+const isVideoFormat = (id) => !!formatInfo(id)?.video;
 
 // ---------- Theme ----------
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');
@@ -74,7 +94,27 @@ function toast(msg, isErr = false) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 3400);
 }
 
-// ---------- Omnibox ----------
+// ---------- Quality picker ----------
+function formatOptions() {
+  const opt = (f) => `<option value="${f.id}">${esc(f.label)}</option>`;
+  const audio = state.formats.filter((f) => !f.video).map(opt).join('');
+  const video = state.formats.filter((f) => f.video).map(opt).join('');
+  return `<optgroup label="Audio">${audio}</optgroup><optgroup label="Video · YouTube only">${video}</optgroup>`;
+}
+/** Video options only make sense for YouTube links; SoundCloud is audio-only. */
+function fitFormatToSite(site) {
+  const sel = $('#format');
+  const noVideo = site === 'soundcloud';
+  sel.querySelector('optgroup[label^="Video"]').disabled = noVideo;
+  if (noVideo && isVideoFormat(sel.value)) {
+    const fallback = isVideoFormat(state.settings.format) ? 'mp3_320' : state.settings.format;
+    sel.value = fallback;
+  } else if (!noVideo && sel.value !== state.settings.format && !sel.dataset.touched) {
+    sel.value = state.settings.format;
+  }
+}
+
+// ---------- Omnibox: link or search ----------
 const input = $('#url');
 const form = $('#add-form');
 const hint = $('#hint');
@@ -88,19 +128,43 @@ function setHint(text, isErr = false) {
   form.classList.toggle('invalid', isErr && !!text);
 }
 
+function setMode(mode) {
+  // mode: 'link' | 'search'
+  const searching = mode === 'search';
+  $('#go-label').textContent = searching ? 'Search' : 'Download';
+  setIcon($('#go-icon'), searching ? 'search' : 'download');
+  setIcon($('#omni-icon'), searching ? 'search' : 'link');
+}
+
 async function onInput() {
   const value = input.value.trim();
   const seq = ++previewSeq;
   clearTimeout(previewTimer);
   preview.hidden = true;
   setHint('');
-  if (!value) return;
+  state.linkSite = null;
+  if (!value) {
+    setMode('link');
+    fitFormatToSite(null);
+    return;
+  }
+  if (!looksLikeLink(value)) {
+    setMode('search');
+    fitFormatToSite(null);
+    if (value.length >= 2) setHint('Press Enter to search SoundCloud and YouTube.');
+    return;
+  }
+  setMode('link');
+  let info;
   try {
-    await invoke('check_url', { url: value });
+    info = await invoke('check_url', { url: value });
   } catch (e) {
     if (value.length > 10 && seq === previewSeq) setHint(String(e), true);
     return;
   }
+  if (seq !== previewSeq) return;
+  state.linkSite = info.site;
+  fitFormatToSite(info.site);
   previewTimer = setTimeout(async () => {
     try {
       const p = await invoke('preview', { url: value });
@@ -109,6 +173,13 @@ async function onInput() {
       if (seq === previewSeq) setHint(String(e), true);
     }
   }, 220);
+}
+
+function kindLabel(kind, site, format) {
+  if (kind === 'set') return site === 'youtube' ? 'Playlist' : 'Set';
+  if (kind === 'profile') return 'Profile';
+  if (site === 'youtube') return isVideoFormat(format) ? 'Video' : '';
+  return '';
 }
 
 function showPreview(p) {
@@ -120,27 +191,41 @@ function showPreview(p) {
     img.removeAttribute('src');
     img.style.visibility = 'hidden';
   }
+  img.classList.toggle('wide', p.site === 'youtube');
   preview.querySelector('strong').textContent = p.title || 'Untitled';
-  preview.querySelector('.preview-text span').textContent = p.artist || '';
-  preview.querySelector('.kind-pill').textContent = { track: 'Track', set: 'Set', profile: 'Profile' }[p.kind] || '';
+  preview.querySelector('.preview-text span').innerHTML = [
+    `<span class="site site-${p.site}">${SITE_NAME[p.site]}</span>`,
+    esc(p.artist),
+  ].filter(Boolean).join(' · ');
+  const label = p.kind === 'track' ? (p.site === 'youtube' ? 'Video' : 'Track') : kindLabel(p.kind, p.site);
+  preview.querySelector('.kind-pill').textContent = label;
   preview.hidden = false;
 }
 
-async function submit(url) {
-  url = String(url ?? input.value).trim();
-  if (!url) {
+async function addLink(url, format = $('#format').value) {
+  const job = await invoke('add_download', { url, format });
+  if (state.filter === 'finished') setFilter('all');
+  upsert(job);
+  return job;
+}
+
+async function submit(text) {
+  const value = String(text ?? input.value).trim();
+  if (!value) {
     input.focus();
-    setHint('Paste a SoundCloud link first.', true);
+    setHint('Paste a link or type a song name first.', true);
     return;
   }
+  if (!looksLikeLink(value)) return runSearch(value);
   try {
-    const job = await invoke('add_download', { url, format: $('#format').value });
+    await addLink(value);
     input.value = '';
     preview.hidden = true;
     setHint('');
     hideClip();
-    if (state.filter === 'finished') setFilter('all');
-    upsert(job);
+    closeResults();
+    setMode('link');
+    fitFormatToSite(null);
   } catch (e) {
     setHint(String(e), true);
     input.focus();
@@ -159,23 +244,27 @@ $('#paste').addEventListener('click', async () => {
   input.focus();
   onInput();
 });
-$('#format').addEventListener('change', (e) => saveSettings({ format: e.target.value }));
+$('#format').addEventListener('change', (e) => {
+  e.target.dataset.touched = '1';
+  // Remember the choice as the default, except video picks (SoundCloud can't use them).
+  if (!isVideoFormat(e.target.value)) saveSettings({ format: e.target.value });
+});
 
-// Offer a SoundCloud link that's sitting on the clipboard.
+// Offer a link that's sitting on the clipboard.
 let lastClip = '';
 async function checkClipboard() {
   const text = await invoke('read_clipboard').catch(() => null);
-  if (!text || text === lastClip || text === input.value.trim()) return;
-  let url;
+  if (!text || text === lastClip || text === input.value.trim() || !looksLikeLink(text)) return;
+  let info;
   try {
-    url = await invoke('check_url', { url: text });
+    info = await invoke('check_url', { url: text });
   } catch {
     return;
   }
   lastClip = text;
-  if ([...state.jobs.values()].some((j) => j.url === url)) return;
+  if ([...state.jobs.values()].some((j) => j.url === info.url)) return;
   const chip = $('#clip-chip');
-  chip.querySelector('.clip-text').textContent = url.replace(/^https:\/\//, '');
+  chip.querySelector('.clip-text').textContent = info.url.replace(/^https:\/\/(www\.)?/, '');
   chip.dataset.url = text;
   chip.hidden = false;
 }
@@ -184,6 +273,63 @@ function hideClip() {
 }
 $('#clip-chip').addEventListener('click', (e) => submit(e.currentTarget.dataset.url));
 window.addEventListener('focus', checkClipboard);
+
+// ---------- Search ----------
+const results = $('#results');
+let searchSeq = 0;
+
+function closeResults() {
+  results.hidden = true;
+  searchSeq++;
+}
+$('#results-close').addEventListener('click', closeResults);
+
+async function runSearch(query) {
+  const seq = ++searchSeq;
+  setHint('');
+  results.hidden = false;
+  $('#results-title').textContent = `Results for “${query}”`;
+  $('#results-body').innerHTML = `<div class="results-loading">Searching SoundCloud and YouTube…<div class="bar"><div class="fill"></div></div></div>`;
+  let hits;
+  try {
+    hits = await invoke('search', { query });
+  } catch (e) {
+    if (seq === searchSeq) $('#results-body').innerHTML = `<p class="results-empty">${esc(e)}</p>`;
+    return;
+  }
+  if (seq !== searchSeq) return;
+  if (!hits.length) {
+    $('#results-body').innerHTML = `<p class="results-empty">Nothing found. Try different words, or paste a link.</p>`;
+    return;
+  }
+  const group = (site) => {
+    const items = hits.filter((h) => h.site === site).slice(0, 6);
+    if (!items.length) return '';
+    return `<div class="results-group"><h3><span class="site site-${site}">${SITE_NAME[site]}</span></h3>${items
+      .map(
+        (h, i) => `<div class="hit ${site === 'soundcloud' ? 'sc' : ''}" data-site="${site}" data-i="${hits.indexOf(h)}">
+          <img alt="" ${h.artwork ? `src="${esc(h.artwork)}"` : ''}>
+          <div class="hit-text"><strong title="${esc(h.title)}">${esc(h.title)}</strong><span>${[esc(h.artist), fmtDuration(h.duration)].filter(Boolean).join(' · ')}</span></div>
+          <button class="ghost-btn small" data-hit="${hits.indexOf(h)}">${icon('download')}Download</button>
+        </div>`,
+      )
+      .join('')}</div>`;
+  };
+  $('#results-body').innerHTML = group('youtube') + group('soundcloud');
+  $('#results-body').querySelectorAll('[data-hit]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const hit = hits[Number(b.dataset.hit)];
+      try {
+        await addLink(hit.url);
+        b.classList.add('added');
+        b.innerHTML = `${icon('check')}Added`;
+        b.disabled = true;
+      } catch (e) {
+        toast(String(e), true);
+      }
+    }),
+  );
+}
 
 // ---------- Download list ----------
 const list = $('#jobs');
@@ -217,7 +363,7 @@ function createJobEl(job) {
   li.className = 'job';
   li.dataset.id = job.id;
   li.innerHTML = `
-    <div class="art"><div class="ph">${icon('music')}</div><span class="badge"></span></div>
+    <div class="art"><div class="ph">${icon(isVideoFormat(job.format) ? 'film' : 'music')}</div><span class="badge"></span></div>
     <div class="job-main">
       <div class="job-title"><strong></strong><span class="kind-pill" hidden></span></div>
       <div class="job-meta"></div>
@@ -228,22 +374,25 @@ function createJobEl(job) {
 }
 
 function statusText(j) {
-  const setPrefix = j.kind !== 'track' && j.total ? `Track ${j.index} of ${j.total}` : '';
+  const word = j.site === 'youtube' ? 'Video' : 'Track';
+  const setPrefix = j.kind !== 'track' && j.total ? `${word} ${j.index} of ${j.total}` : '';
+  const video = isVideoFormat(j.format);
   switch (j.status) {
     case 'queued':
       return state.engine.ready ? 'Waiting for a free slot…' : 'Waiting for the engine…';
     case 'starting':
-      return 'Starting…';
+      return esc(j.note) || 'Starting…';
     case 'downloading':
       if (setPrefix) return [setPrefix, esc(j.current), fmtSpeed(j.speed)].filter(Boolean).join(' · ');
       return [`${Math.round(j.progress * 100)}%`, fmtSpeed(j.speed), fmtEta(j.eta)].filter(Boolean).join(' · ');
     case 'converting': {
-      const what = j.format === 'original' ? 'Finishing up…' : 'Converting to MP3…';
+      const what = video ? 'Merging video and sound…' : j.format === 'original' ? 'Finishing up…' : 'Converting to MP3…';
       return setPrefix ? `${setPrefix} · ${what}` : what;
     }
     case 'done': {
       const n = j.files.length;
-      let text = j.kind === 'track' ? `Saved · ${esc(formatLabel(j.format))}` : `${n} track${n === 1 ? '' : 's'} saved`;
+      const things = video ? 'video' : j.site === 'youtube' ? 'file' : 'track';
+      let text = j.kind === 'track' ? `Saved · ${esc(formatLabel(j.format))}` : `${n} ${things}${n === 1 ? '' : 's'} saved`;
       if (j.warning) text += ` <span class="warn">· ${esc(j.warning)}</span>`;
       return text;
     }
@@ -294,10 +443,15 @@ function patchJob(li, j) {
   title.textContent = j.title || 'Untitled';
   title.title = j.title || '';
   const pill = li.querySelector('.kind-pill');
-  pill.hidden = j.kind === 'track';
-  pill.textContent = j.kind === 'set' ? 'Set' : 'Profile';
+  const label = kindLabel(j.kind, j.site, j.format);
+  pill.hidden = !label;
+  pill.textContent = label;
 
-  const meta = [j.artist ? esc(j.artist) : '', `<span class="job-status">${statusText(j)}</span>`].filter(Boolean);
+  const meta = [
+    `<span class="site site-${j.site}">${SITE_NAME[j.site] || ''}</span>`,
+    j.artist ? esc(j.artist) : '',
+    `<span class="job-status">${statusText(j)}</span>`,
+  ].filter(Boolean);
   li.querySelector('.job-meta').innerHTML = meta.join('<span class="sep">•</span>');
 
   const bar = li.querySelector('.bar');
@@ -428,6 +582,14 @@ function renderEngine(e) {
   $('#s-ytdlp').textContent = e.ytdlpVersion ? `Version ${e.ytdlpVersion}` : e.busy ? e.stage : 'Not installed yet';
   $('#s-ffmpeg').textContent =
     e.ffmpeg === 'system' ? 'Using the copy already on this computer' : e.ffmpeg === 'managed' ? 'Managed by slothDJ' : '…';
+  const js = e.js || '';
+  $('#s-js').textContent = js.startsWith('node')
+    ? 'Uses Node.js, already on this computer'
+    : js.startsWith('deno (system')
+      ? 'Uses Deno, already on this computer'
+      : js.startsWith('deno')
+        ? 'Uses Deno, downloaded by slothDJ'
+        : 'Set up automatically on your first YouTube download';
   state.jobs.forEach((j) => j.status === 'queued' && renderJob(j));
 }
 $('#engine-retry').addEventListener('click', () => invoke('update_engine').catch((err) => toast(String(err), true)));
@@ -448,9 +610,12 @@ function renderSettings() {
   $('#s-dir').title = s.outputDir;
   $('#folder-path').textContent = prettyPath(s.outputDir);
   $('#folder-btn').title = `Open ${s.outputDir}`;
-  $('#format').value = s.format;
+  if (!$('#format').dataset.touched) $('#format').value = s.format;
   $('#s-format').value = s.format;
   $('#s-art').checked = s.embedArtwork;
+  $('#s-tray').checked = s.closeToTray;
+  $('#s-notify').checked = s.notify;
+  $('#s-autostart').checked = s.startWithSystem;
   segment('#s-parallel', String(s.maxConcurrent));
   segment('#s-theme', s.theme);
   applyTheme();
@@ -465,8 +630,21 @@ function renderPort(port) {
   $('#s-port').textContent = port ? `Listening on 127.0.0.1:${port}` : 'Not listening';
 }
 
-$('#s-format').addEventListener('change', (e) => saveSettings({ format: e.target.value }));
+$('#s-format').addEventListener('change', (e) => {
+  delete $('#format').dataset.touched;
+  saveSettings({ format: e.target.value });
+});
 $('#s-art').addEventListener('change', (e) => saveSettings({ embedArtwork: e.target.checked }));
+$('#s-tray').addEventListener('change', (e) => saveSettings({ closeToTray: e.target.checked }));
+$('#s-notify').addEventListener('change', (e) => saveSettings({ notify: e.target.checked }));
+$('#s-autostart').addEventListener('change', async (e) => {
+  try {
+    state.settings = await invoke('set_autostart', { enabled: e.target.checked });
+  } catch (err) {
+    toast(String(err), true);
+  }
+  renderSettings();
+});
 $('#s-parallel').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (b) saveSettings({ maxConcurrent: Number(b.dataset.v) });
@@ -488,15 +666,56 @@ $('#s-repair').addEventListener('click', () =>
 const openExt = () => invoke('open_url', { url: `${REPO}#browser-extension` });
 $('#s-ext').addEventListener('click', openExt);
 $('#get-ext').addEventListener('click', openExt);
-$('#s-github').addEventListener('click', () => invoke('open_url', { url: REPO }));
+$('#s-github').addEventListener('click', (e) => {
+  e.preventDefault();
+  invoke('open_url', { url: REPO });
+});
 $('#folder-btn').addEventListener('click', () => invoke('open_output_dir').catch((err) => toast(String(err), true)));
+
+// ---------- App updates ----------
+function showUpdate(info) {
+  $('#update-title').textContent = `slothDJ ${info.version} is ready`;
+  $('#update-sub').textContent = 'Installs in a few seconds and restarts slothDJ.';
+  $('#update-banner').hidden = false;
+  $('#s-app-update').textContent = `Version ${info.version} is available`;
+}
+async function checkAppUpdate() {
+  const label = $('#s-app-update');
+  label.textContent = 'Checking…';
+  try {
+    const info = await invoke('check_update');
+    if (info) showUpdate(info);
+    else label.textContent = 'You have the latest version.';
+  } catch (err) {
+    label.textContent = String(err);
+  }
+}
+$('#s-check-app').addEventListener('click', checkAppUpdate);
+$('#update-dismiss').addEventListener('click', () => ($('#update-banner').hidden = true));
+$('#update-now').addEventListener('click', async () => {
+  const running = [...state.jobs.values()].filter((j) => RUNNING.includes(j.status)).length;
+  if (running && !confirm(`${running} download${running > 1 ? 's are' : ' is'} still running and will stop. Update now?`)) return;
+  $('#update-now').disabled = true;
+  $('#update-sub').textContent = 'Downloading the update…';
+  $('#update-banner .bar').hidden = false;
+  try {
+    await invoke('install_update'); // restarts slothDJ when done
+  } catch (err) {
+    $('#update-now').disabled = false;
+    $('#update-banner .bar').hidden = true;
+    $('#update-sub').textContent = String(err);
+  }
+});
 
 // ---------- Window ----------
 $('#win-min').addEventListener('click', () => appWindow.minimize());
 $('#win-max').addEventListener('click', () => appWindow.toggleMaximize());
 $('#win-close').addEventListener('click', () => {
-  const running = [...state.jobs.values()].filter((j) => RUNNING.includes(j.status)).length;
-  if (running && !confirm(`${running} download${running > 1 ? 's are' : ' is'} still running. Quit anyway?`)) return;
+  // With "keep running in the tray" on, closing just hides the window and downloads carry on.
+  if (!state.settings.closeToTray) {
+    const running = [...state.jobs.values()].filter((j) => RUNNING.includes(j.status)).length;
+    if (running && !confirm(`${running} download${running > 1 ? 's are' : ' is'} still running. Quit anyway?`)) return;
+  }
   appWindow.close();
 });
 
@@ -533,11 +752,13 @@ window.addEventListener('drop', (e) => {
 document.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
-  if (e.key === 'Escape' && !drawer.hidden) closeSettings();
-  else if (mod && key === ',') {
+  if (e.key === 'Escape') {
+    if (!drawer.hidden) closeSettings();
+    else if (!results.hidden) closeResults();
+  } else if (mod && key === ',') {
     e.preventDefault();
     openSettings();
-  } else if (mod && key === 'l') {
+  } else if (mod && (key === 'l' || key === 'f')) {
     e.preventDefault();
     input.focus();
     input.select();
@@ -554,12 +775,17 @@ document.addEventListener('contextmenu', (e) => {
 async function init() {
   hydrateIcons();
   const s = await invoke('get_state');
+  state.platform = s.platform;
   if (s.platform === 'macos') document.body.classList.add('mac');
+  $('#s-autostart-label').textContent =
+    s.platform === 'macos' ? 'Open at login' : s.platform === 'windows' ? 'Start with Windows' : 'Start when you log in';
   state.formats = s.formats;
   state.settings = s.settings;
-  const options = s.formats.map((f) => `<option value="${f.id}">${esc(f.label)}</option>`).join('');
-  $('#format').innerHTML = options;
-  $('#s-format').innerHTML = options;
+  $('#format').innerHTML = formatOptions();
+  $('#s-format').innerHTML = state.formats
+    .filter((f) => !f.video)
+    .map((f) => `<option value="${f.id}">${esc(f.label)}</option>`)
+    .join('');
   $('#s-version').textContent = `v${s.version}`;
   s.jobs.forEach((j) => state.jobs.set(j.id, j));
   renderSettings();
@@ -581,6 +807,10 @@ async function init() {
     renderSettings();
   });
   await listen('toast', (m) => toast(m));
+  await listen('update-available', showUpdate);
+  await listen('update-progress', ([got, total]) => {
+    if (total) $('#update-fill').style.width = `${Math.min(100, (got / total) * 100)}%`;
+  });
 
   input.focus();
   checkClipboard();

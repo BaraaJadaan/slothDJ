@@ -6,8 +6,8 @@
 
 <p align="center">
   <b>Slow animal. Fast downloads.</b><br>
-  A tiny desktop app and browser extension that saves SoundCloud tracks, sets and whole profiles<br>
-  as tagged MP3s with cover art, in one click.
+  A tiny desktop app and browser extension that saves SoundCloud and YouTube<br>
+  as tagged MP3s with cover art, or as MP4 video, in one click.
 </p>
 
 <p align="center">
@@ -23,19 +23,20 @@
 </p>
 
 <p align="center">
-  <img src="docs/app-main.png" width="820" alt="slothDJ main window: a link box with a preview, and a list of downloads with progress bars">
+  <img src="docs/app-main.png" width="820" alt="slothDJ main window: a YouTube link with a preview, and downloads from YouTube and SoundCloud with progress bars">
 </p>
 
 ## Why slothDJ
 
-- **Small and quick.** The core is native Rust on Tauri, not Electron: a 2 MB installer and a 5 MB app that starts instantly. It uses the web view built into your OS instead of shipping its own copy of Chrome.
-- **One click from SoundCloud.** The extension puts a slothDJ button next to Like and Share on every track, and shows live progress right on the page.
-- **Tracks, sets and profiles.** Paste a playlist or an artist page and get every track, numbered, in its own folder.
-- **Your quality.** MP3 at 320, 192 or 128 kbps, or the original stream with no re-encoding.
-- **Tagged and tidy.** Title, artist, year and cover art are embedded. Files are named `Artist - Title.mp3`.
-- **Engine that stays current.** slothDJ uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) under the hood and updates it automatically, so SoundCloud changes don't break it for long.
+- **Small and quick.** The core is native Rust on Tauri, not Electron: a 2 MB installer and a small app that starts instantly. It uses the web view built into your OS instead of shipping its own copy of Chrome.
+- **SoundCloud and YouTube.** Tracks, sets and whole profiles from SoundCloud; videos, Shorts, YouTube Music and playlists from YouTube.
+- **MP3 or video.** MP3 at 320, 192 or 128 kbps, the original audio with no re-encoding, or MP4 video at 480p, 720p, 1080p or the best available (up to 4K).
+- **Search by name.** No link? Type a song or artist and pick from SoundCloud and YouTube results.
+- **One click from your browser.** The extension adds a slothDJ button on SoundCloud tracks and under YouTube videos, with live progress right on the page.
+- **Tagged and tidy.** Title, artist, year and square cover art are embedded. Files are named `Artist - Title.mp3`, and YouTube clutter like "(Official Video)" is dropped from names.
+- **Always ready.** slothDJ keeps running in the tray when you close the window, can start with your computer, and notifies you when downloads finish.
+- **Updates itself.** New versions install in one click from inside the app. The download engine ([yt-dlp](https://github.com/yt-dlp/yt-dlp)) also keeps itself current, so site changes don't break it for long.
 - **Private.** Everything runs on your computer. No accounts, no tracking, no servers.
-- **Nice to use.** Dark and light themes, drag a link onto the window, links on your clipboard are offered automatically, and keyboard shortcuts.
 
 ## Install
 
@@ -50,7 +51,9 @@ Grab the file for your system from the **[latest release](https://github.com/Bar
 | macOS, Intel | `slothDJ_x.y.z_x64.dmg` |
 | Linux | `slothDJ_x.y.z_amd64.AppImage` or `.deb` |
 
-On first launch slothDJ downloads its engine once: yt-dlp (about 22 MB), plus ffmpeg (about 28 MB) if it isn't already installed on your computer.
+From v1.1.0 on, slothDJ updates itself: when a new version is out, a banner offers to install it.
+
+On first launch slothDJ downloads its engine once: yt-dlp (about 22 MB), plus ffmpeg (about 28 MB) if it isn't already installed. YouTube also needs a small JavaScript engine: slothDJ uses Node.js or Deno if you have one, and otherwise downloads Deno (about 40 MB) the first time you download from YouTube.
 
 <p align="center">
   <img src="docs/app-setup.png" width="560" alt="First launch: slothDJ setting up its download engine with a progress bar">
@@ -66,38 +69,47 @@ On first launch slothDJ downloads its engine once: yt-dlp (about 22 MB), plus ff
 
 Works in Chrome, Edge, Brave, Opera, Vivaldi and other Chromium browsers.
 
-1. Download `slothDJ-extension-vX.Y.Z.zip` from the [latest release](https://github.com/BaraaJadaan/slothDJ/releases/latest) and unzip it.
+1. Download `slothDJ-extension-vX.Y.Z.zip` from the [latest release](https://github.com/BaraaJadaan/slothDJ/releases/latest) and unzip it into a folder you'll keep, for example `C:\slothDJ-extension`. The browser loads the extension from that folder every time, so don't delete it.
 2. Open `chrome://extensions` (or `edge://extensions`).
 3. Turn on **Developer mode**, click **Load unpacked**, and choose the unzipped folder.
 4. Pin slothDJ to your toolbar.
 
+To update the extension later, unzip the new version over the same folder and click the reload icon on its card.
+
 <p align="center">
-  <img src="docs/extension-popup.png" width="300" alt="slothDJ extension popup showing the current track, a quality picker, a Download button, and recent downloads">
+  <img src="docs/extension-popup.png" width="300" alt="slothDJ extension popup on a YouTube video: preview, a quality picker set to MP4 1080p, a Download button, and recent downloads">
 </p>
 
 ## Using it
 
-- **In the app:** paste a link (or drag one onto the window), pick a quality and press **Download**. A SoundCloud link sitting on your clipboard is offered automatically when you switch to slothDJ.
-- **On SoundCloud:** click the pink slothDJ button next to Like, Repost and Share, on a track page, a set, or any track in a list. A small card shows progress and lets you cancel.
-- **Anywhere:** right-click a SoundCloud link and choose **Download with slothDJ**.
-- **App not running?** The extension offers to open it, and the download starts as soon as it opens.
+- **Paste a link:** paste or drag a SoundCloud or YouTube link onto the window, pick a quality and press **Download**. A link sitting on your clipboard is offered automatically when you switch to slothDJ.
+- **Search:** type a song or artist instead and press **Enter**. Results from YouTube and SoundCloud appear; click **Download** on the one you want.
+- **On SoundCloud:** click the pink slothDJ button next to Like, Repost and Share, on a track page, a set, or any track in a list.
+- **On YouTube:** click the **slothDJ** button under the video, next to Like and Share. Pick MP3 or a video quality from the extension's toolbar icon; it remembers your choice.
+- **Right-click:** on any SoundCloud link choose **Download with slothDJ**; on YouTube links choose **Download audio (MP3)** or **Download video (MP4)**.
+- **App not open?** The extension offers to open it, and the download starts as soon as it does.
+
+<p align="center">
+  <img src="docs/app-search.png" width="720" alt="Searching for a song by name: results from YouTube and SoundCloud, each with a Download button">
+</p>
 
 | Shortcut | Action |
 | --- | --- |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>V</kbd> | Paste a link (from anywhere in the window) |
-| <kbd>Enter</kbd> | Start the download |
+| <kbd>Enter</kbd> | Download the link, or search for the words you typed |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>L</kbd> | Jump to the link box |
 | <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>,</kbd> | Settings |
+| <kbd>Esc</kbd> | Close search results or Settings |
 | Double-click a finished download | Play it |
 
 <table>
   <tr>
-    <td><img src="docs/app-settings.png" alt="Settings: download folder, default quality, artwork embedding, parallel downloads, theme, engine version"></td>
-    <td><img src="docs/app-light.png" alt="slothDJ in the light theme"></td>
+    <td><img src="docs/app-settings.png" alt="Settings: download folder, default quality, artwork, parallel downloads, tray, start with Windows, notifications, theme"></td>
+    <td><img src="docs/app-light.png" alt="slothDJ in the light theme, with the update banner showing"></td>
   </tr>
   <tr>
     <td align="center"><sub>Settings</sub></td>
-    <td align="center"><sub>Light theme</sub></td>
+    <td align="center"><sub>Light theme, with an update ready</sub></td>
   </tr>
 </table>
 
@@ -105,21 +117,22 @@ Works in Chrome, Edge, Brave, Opera, Vivaldi and other Chromium browsers.
 
 ```mermaid
 flowchart LR
-    A["SoundCloud page<br/>(slothDJ button)"] -->|link| B["Extension<br/>service worker"]
+    A["SoundCloud / YouTube page<br/>(slothDJ button)"] -->|link| B["Extension<br/>service worker"]
     B -->|"POST 127.0.0.1:37771"| C["slothDJ app<br/>(Rust core)"]
-    C -->|runs| D["yt-dlp + ffmpeg"]
+    C -->|runs| D["yt-dlp + ffmpeg<br/>(+ Deno/Node for YouTube)"]
     D --> E[("Music/slothDJ")]
     C -. live progress .-> B
 ```
 
-- The **app** (`app/`) is a Tauri 2 app. The Rust core (`app/src-tauri/src`) runs the download queue, manages the engine and serves a small local API. The UI (`app/ui`) is plain HTML, CSS and JS, with no framework and no build step.
+- The **app** (`app/`) is a Tauri 2 app. The Rust core (`app/src-tauri/src`) runs the download queue, manages the engine, searches, and serves a small local API. The UI (`app/ui`) is plain HTML, CSS and JS, with no framework and no build step.
+- **Sites** live in their own modules: `soundcloud.rs` and `youtube.rs` turn a pasted link into a canonical one with a quick preview, and `sources.rs` routes between them. Adding another site means adding one more module.
 - The **extension** (`extension/`) is a Manifest V3 extension. It never downloads anything itself. It hands links to the app over `http://127.0.0.1:37771` (or the next free port up to 37775).
 - The **local API** only listens on 127.0.0.1 and accepts requests from browser extensions or local tools. Requests from websites are refused, so a web page can't make slothDJ download things.
 
 | Method | Path | What it does |
 | --- | --- | --- |
 | `GET` | `/api/status` | App version, engine status, available formats |
-| `POST` | `/api/download` | `{"url": "…", "format": "mp3_320"}` queues a download |
+| `POST` | `/api/download` | `{"url": "…", "format": "mp3_320"}` queues a download (`mp4_1080` etc. for YouTube video) |
 | `GET` | `/api/jobs/{id}` | Progress of one download |
 | `POST` | `/api/jobs/{id}/cancel` | Cancel it |
 | `POST` | `/api/show` | Bring the window to the front |
@@ -143,30 +156,34 @@ To try the extension, load the `extension/` folder unpacked (see above).
 
 ```
 app/
-  src-tauri/src/   Rust core: queue (jobs.rs), engine setup (engine.rs), SoundCloud links (soundcloud.rs), local API (server.rs)
+  src-tauri/src/   Rust core: queue (jobs.rs), engine (engine.rs), sites (soundcloud.rs, youtube.rs),
+                   search (search.rs), local API (server.rs), tray and updates (main.rs)
   ui/              The app's interface
-extension/         Browser extension (popup, background worker, SoundCloud button)
+extension/         Browser extension (popup, background worker, page buttons for SoundCloud and YouTube)
 brand/             Logo source and renders
 scripts/           Icon rendering and screenshot tooling
 ```
 
-Releases are automatic: push a tag like `v1.1.0` and GitHub Actions builds every platform and publishes the release.
+### Releases
+
+Push a tag like `v1.2.0` and GitHub Actions builds every platform and publishes the release, including the signed `latest.json` the in-app updater reads. Update files are signed with a private key kept in the repository secret `TAURI_SIGNING_PRIVATE_KEY`; its public half is in `app/src-tauri/tauri.conf.json`. Local builds don't need the key.
 
 ## Roadmap
 
-- [ ] YouTube to MP3 in several qualities. The engine and the quality picker already support it; it needs a source module next to `soundcloud.rs`.
 - [ ] Firefox version of the extension
-- [ ] In-app updates for slothDJ itself
 - [ ] Search in download history
+- [ ] More sites (Bandcamp, Mixcloud)
+- [ ] Extension in the Chrome Web Store and Edge Add-ons for one-click install
 
 ## Responsible use
 
-slothDJ is meant for music you're allowed to keep, such as tracks artists offer for free, Creative Commons releases, or your own uploads. Respect artists and SoundCloud's terms. slothDJ is an independent project and isn't affiliated with or endorsed by SoundCloud.
+slothDJ is meant for media you're allowed to keep, such as music artists offer for free, Creative Commons works, or your own uploads. Respect creators and each site's terms. slothDJ is an independent project and isn't affiliated with or endorsed by SoundCloud or YouTube.
 
 ## Credits
 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense) does the extracting. slothDJ downloads the official build at runtime.
 - [FFmpeg](https://ffmpeg.org) (LGPL/GPL) does the converting and tagging. Static builds come from [ffmpeg-static](https://github.com/eugeneware/ffmpeg-static), downloaded at runtime.
+- [Deno](https://deno.com) (MIT) runs YouTube's player scripts for yt-dlp when Node.js isn't installed. Downloaded at runtime.
 - [Tauri](https://tauri.app) runs the app shell. Icons are from [Lucide](https://lucide.dev) (ISC).
 
 ## License

@@ -25,19 +25,30 @@
 
     <main class="scroll">
       <div class="container">
+        <div id="update-banner" class="update-banner" hidden>
+          <span class="update-icon" data-icon="sparkle"></span>
+          <div class="update-text">
+            <strong id="update-title">A new version of slothDJ is ready</strong>
+            <span id="update-sub">Installs in a few seconds and restarts slothDJ.</span>
+            <div class="bar" hidden><div class="fill" id="update-fill"></div></div>
+          </div>
+          <button id="update-now" class="primary-btn small">Update now</button>
+          <button id="update-dismiss" class="icon-btn" aria-label="Later" title="Later" data-icon="x"></button>
+        </div>
+
         <section class="hero">
-          <h1>Drop a SoundCloud link.</h1>
-          <p class="sub">Tracks, sets and whole profiles, saved as tagged audio with artwork.</p>
+          <h1>Drop a SoundCloud or YouTube link.</h1>
+          <p class="sub">Tracks, videos, sets and playlists, saved as tagged MP3 or MP4. Or just type a song name.</p>
 
           <form id="add-form" class="omnibox" autocomplete="off">
-            <span class="omni-icon" data-icon="link"></span>
-            <input id="url" type="text" spellcheck="false" placeholder="https://soundcloud.com/artist/track" aria-label="SoundCloud link">
+            <span class="omni-icon" id="omni-icon" data-icon="link"></span>
+            <input id="url" type="text" spellcheck="false" placeholder="Paste a link, or type a song name to search" aria-label="Link or search">
             <button type="button" id="paste" class="ghost-btn" title="Paste from clipboard"><span data-icon="clipboard"></span>Paste</button>
             <label class="select">
               <select id="format" aria-label="Quality"></select>
               <span data-icon="chevron"></span>
             </label>
-            <button type="submit" id="go" class="primary-btn"><span data-icon="download"></span>Download</button>
+            <button type="submit" id="go" class="primary-btn"><span id="go-icon" data-icon="download"></span><span id="go-label">Download</span></button>
           </form>
 
           <div class="below-omni">
@@ -53,6 +64,14 @@
               <b>Add</b>
             </button>
           </div>
+        </section>
+
+        <section id="results" class="results" hidden>
+          <div class="results-head">
+            <h2 id="results-title">Results</h2>
+            <button class="icon-btn" id="results-close" aria-label="Close results" title="Close (Esc)" data-icon="x"></button>
+          </div>
+          <div id="results-body"></div>
         </section>
 
         <section class="downloads">
@@ -83,7 +102,7 @@
           <div id="empty" class="empty" hidden>
             <img src="logo.svg" alt="" class="empty-logo">
             <h3>Nothing here yet</h3>
-            <p>Paste a link above, drop one onto this window, or hit the <b>slothDJ</b> button on any SoundCloud track.</p>
+            <p>Paste a SoundCloud or YouTube link above, type a song name to search, or hit the <b>slothDJ</b> button in your browser.</p>
             <button class="ghost-btn" id="get-ext"><span data-icon="puzzle"></span>Get the browser extension</button>
           </div>
         </section>
@@ -130,6 +149,20 @@
           </div>
         </div>
 
+        <h4>Background</h4>
+        <div class="row">
+          <div><label for="s-tray">Keep running in the tray</label><small>Closing the window hides slothDJ, so the extension keeps working</small></div>
+          <label class="switch"><input type="checkbox" id="s-tray"><span></span></label>
+        </div>
+        <div class="row">
+          <div><label for="s-autostart" id="s-autostart-label">Start with Windows</label><small>Opens quietly in the tray when you sign in</small></div>
+          <label class="switch"><input type="checkbox" id="s-autostart"><span></span></label>
+        </div>
+        <div class="row">
+          <div><label for="s-notify">Notify when downloads finish</label><small>Only while slothDJ is in the background</small></div>
+          <label class="switch"><input type="checkbox" id="s-notify"><span></span></label>
+        </div>
+
         <h4>Appearance</h4>
         <div class="row">
           <label>Theme</label>
@@ -147,6 +180,9 @@
           <div><label>ffmpeg</label><small id="s-ffmpeg">…</small></div>
           <button class="ghost-btn small" id="s-repair">Repair</button>
         </div>
+        <div class="row">
+          <div><label>YouTube support</label><small id="s-js">…</small></div>
+        </div>
 
         <h4>Browser extension</h4>
         <div class="row">
@@ -158,11 +194,11 @@
           <img src="logo.svg" alt="" width="40" height="40">
           <div>
             <strong>slothDJ <span id="s-version"></span></strong>
-            <small>Slow animal, fast downloads.</small>
+            <small id="s-app-update">Slow animal, fast downloads.</small>
           </div>
-          <button class="ghost-btn small" id="s-github"><span data-icon="external"></span>GitHub</button>
+          <button class="ghost-btn small" id="s-check-app">Check for updates</button>
         </div>
-        <p class="fineprint">Only download music you have the right to keep, such as tracks the artist offers for free or your own uploads.</p>
+        <p class="fineprint">Only download what you have the right to keep, such as music artists offer for free, Creative Commons works, or your own uploads. <a href="#" id="s-github">slothDJ on GitHub</a></p>
       </div>
     </aside>
   </div>

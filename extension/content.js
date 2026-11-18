@@ -1,4 +1,4 @@
-// Adds a slothDJ button next to Like/Repost/Share on SoundCloud, plus a small progress toast.
+// Adds a slothDJ button on SoundCloud (next to Like/Repost/Share) and YouTube (under the video), plus a small progress toast.
 (() => {
   if (window.__slothdj) return;
   window.__slothdj = true;
@@ -20,7 +20,26 @@
   let hideTimer;
 
   // ---------- Buttons ----------
-  /** The sound a button group belongs to: the page itself (hero) or the list item around it. */
+  const onYouTube = /(^|\.)youtube\.com$/.test(location.hostname);
+
+  function makeButton(className, url, labelClass) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = className;
+    b.innerHTML = `<div class="sdj-ico"></div><span class="${labelClass} sdj-label"></span>`;
+    b.addEventListener('click', onClick);
+    point(b, url);
+    return b;
+  }
+
+  /** Aim a button at a (new) link, e.g. after YouTube navigates to another video. */
+  function point(b, url) {
+    b.dataset.url = url;
+    b.dataset.key = keyOf(url);
+    paint(b, jobs.get(b.dataset.key));
+  }
+
+  // SoundCloud: a button in every Like/Repost/Share bar (track page and every list item).
   function soundUrl(group) {
     if (group.closest('.listenEngagement, .l-listen-hero, .fullHero')) return location.origin + location.pathname;
     const item = group.closest('.trackItem, .sound, .soundBadge, .searchItem, .soundList__item, .compactTrackListItem');
@@ -28,32 +47,39 @@
     return a ? new URL(a.getAttribute('href'), location.origin).href : null;
   }
 
-  function makeButton(size, url) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = `sc-button-secondary sc-button sc-button-${size} sc-button-icon sc-button-responsive sdj-btn`;
-    b.dataset.url = url;
-    b.dataset.key = keyOf(url);
-    b.innerHTML = `<div class="sdj-ico"></div><span class="sc-button-label sdj-label"></span>`;
-    b.addEventListener('click', onClick);
-    paint(b, jobs.get(b.dataset.key));
-    return b;
-  }
-
-  function scan() {
+  function scanSoundCloud() {
     document.querySelectorAll('.soundActions .sc-button-group:not(:has(> .sdj-btn))').forEach((group) => {
       const url = soundUrl(group);
       if (!url || !SDJ.classify(url)) return;
       const size = group.classList.contains('sc-button-group-small') ? 'small' : 'medium';
-      group.appendChild(makeButton(size, url));
+      const cls = `sc-button-secondary sc-button sc-button-${size} sc-button-icon sc-button-responsive sdj-btn`;
+      group.appendChild(makeButton(cls, url, 'sc-button-label'));
     });
   }
 
+  // YouTube: one button next to Like and Share under the video. YouTube is a single-page
+  // app, so the same button is re-aimed whenever you open another video.
+  function scanYouTube() {
+    const target = SDJ.classify(location.href);
+    const bar = document.querySelector('ytd-watch-metadata #top-level-buttons-computed');
+    let b = document.querySelector('.sdj-yt-btn');
+    if (!target || target.kind !== 'track' || !bar) return;
+    if (!b || b.parentElement !== bar) {
+      b?.remove();
+      b = makeButton('sdj-btn sdj-yt-btn', target.url, '');
+      bar.appendChild(b);
+    } else if (b.dataset.key !== target.url) {
+      point(b, target.url);
+    }
+  }
+
+  const scan = onYouTube ? scanYouTube : scanSoundCloud;
   let scanTimer;
   new MutationObserver(() => {
     clearTimeout(scanTimer);
     scanTimer = setTimeout(scan, 250);
   }).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('yt-navigate-finish', () => setTimeout(scan, 50));
   scan();
 
   // ---------- Job tracking ----------
@@ -67,7 +93,7 @@
         case 'queued':
         case 'starting': state = 'busy'; label = 'Queued'; title = 'Queued in slothDJ'; break;
         case 'downloading': state = 'busy'; label = `${Math.round(job.progress * 100)}%`; title = `Downloading: ${job.title}`; break;
-        case 'converting': state = 'busy'; label = 'MP3…'; title = 'Converting…'; break;
+        case 'converting': state = 'busy'; label = job.format?.startsWith('mp4_') ? 'Merging…' : 'MP3…'; title = 'Finishing up…'; break;
         case 'done': state = 'done'; title = `Saved by slothDJ: ${job.title}`; break;
         case 'failed': state = 'error'; title = job.error || 'Download failed'; break;
         default: break;
@@ -78,9 +104,14 @@
       b.querySelector('.sdj-ico').innerHTML = ICON[state];
     }
     const l = b.querySelector('.sdj-label');
-    l.textContent = label || 'slothDJ';
-    l.classList.toggle('sc-visuallyhidden', !label);
-    b.classList.toggle('sdj-wide', !!label);
+    if (b.classList.contains('sdj-yt-btn')) {
+      // YouTube's buttons carry text labels, so ours always does too.
+      l.textContent = label || { done: 'Saved', error: 'Failed' }[state] || 'slothDJ';
+    } else {
+      l.textContent = label || 'slothDJ';
+      l.classList.toggle('sc-visuallyhidden', !label);
+      b.classList.toggle('sdj-wide', !!label);
+    }
     b.title = title;
     b.setAttribute('aria-label', title);
   }
@@ -247,7 +278,8 @@
   }
 
   async function toastOffline(url) {
-    const { format } = await chrome.storage.sync.get('format');
+    const key = SDJ.formatKey(SDJ.classify(url)?.site);
+    const format = (await chrome.storage.sync.get(key))[key];
     toast({
       tone: 'err',
       title: 'slothDJ isn’t running',

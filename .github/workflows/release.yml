@@ -71,9 +71,14 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the update files so installed copies can verify updates (see tauri.conf.json → plugins.updater.pubkey).
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
           releaseId: ${{ needs.create-release.outputs.id }}
-          args: ${{ matrix.args }}
+          # Release builds also produce signed update files and latest.json for the in-app updater.
+          args: ${{ matrix.args }} --config app/src-tauri/tauri.release.conf.json
+          includeUpdaterJson: true
 
       - name: Attach the portable Windows exe
         if: matrix.os == 'windows-latest'

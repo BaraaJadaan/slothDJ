@@ -3,10 +3,14 @@
 const $ = (s) => document.querySelector(s);
 const send = (msg) => chrome.runtime.sendMessage(msg).catch(() => ({ offline: true }));
 const FALLBACK_FORMATS = [
-  { id: 'mp3_320', label: 'MP3 · 320 kbps' },
-  { id: 'mp3_192', label: 'MP3 · 192 kbps' },
-  { id: 'mp3_128', label: 'MP3 · 128 kbps' },
-  { id: 'original', label: 'Original (no re-encode)' },
+  { id: 'mp3_320', label: 'MP3 · 320 kbps', video: false },
+  { id: 'mp3_192', label: 'MP3 · 192 kbps', video: false },
+  { id: 'mp3_128', label: 'MP3 · 128 kbps', video: false },
+  { id: 'original', label: 'Original audio', video: false },
+  { id: 'mp4_best', label: 'MP4 · Best quality', video: true },
+  { id: 'mp4_1080', label: 'MP4 · 1080p', video: true },
+  { id: 'mp4_720', label: 'MP4 · 720p', video: true },
+  { id: 'mp4_480', label: 'MP4 · 480p', video: true },
 ];
 
 let tab = null;
@@ -33,16 +37,21 @@ function renderConnection() {
   $('#offline').hidden = status.online;
 }
 
+/** Quality picker: audio for SoundCloud; audio or video for YouTube. Remembered per site. */
 async function renderFormats() {
-  const { format = '' } = await chrome.storage.sync.get('format');
+  const site = target?.site ?? 'soundcloud';
+  const key = SDJ.formatKey(site);
+  const saved = (await chrome.storage.sync.get(key))[key] || '';
   const formats = status.formats?.length ? status.formats : FALLBACK_FORMATS;
   const def = formats.find((f) => f.id === status.defaultFormat);
+  const opt = (f) => `<option value="${f.id}">${f.label}</option>`;
   const sel = $('#format');
   sel.innerHTML =
     `<option value="">${def ? `App default (${def.label.replace('MP3 · ', 'MP3 ')})` : 'App default'}</option>` +
-    formats.map((f) => `<option value="${f.id}">${f.label}</option>`).join('');
-  sel.value = format;
-  sel.addEventListener('change', () => chrome.storage.sync.set({ format: sel.value }));
+    `<optgroup label="Audio">${formats.filter((f) => !f.video).map(opt).join('')}</optgroup>` +
+    (site === 'youtube' ? `<optgroup label="Video">${formats.filter((f) => f.video).map(opt).join('')}</optgroup>` : '');
+  sel.value = sel.querySelector(`option[value="${saved}"]`) ? saved : '';
+  sel.addEventListener('change', () => chrome.storage.sync.set({ [key]: sel.value }));
 }
 
 async function renderTarget() {
@@ -52,20 +61,24 @@ async function renderTarget() {
   }
   $('#current').hidden = false;
   $('#controls').hidden = false;
-  $('#kind').textContent = SDJ.KIND_LABEL[target.kind];
-  $('#title').textContent = target.url.replace('https://soundcloud.com/', '');
+  $('#kind').textContent = SDJ.kindLabel(target);
+  $('#title').textContent = target.site === 'youtube' ? `YouTube ${SDJ.kindLabel(target).toLowerCase()}` : target.url.replace('https://soundcloud.com/', '');
+  $('#artist').textContent = SDJ.SITE_NAME[target.site];
+  const videoId = target.url.split('watch?v=')[1];
+  if (videoId) $('#art').src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
   const btn = $('#dl');
   btn.querySelector('span').textContent = status.online ? 'Download' : 'Open slothDJ & download';
 
   try {
+    const endpoint = target.site === 'youtube' ? 'https://www.youtube.com/oembed' : 'https://soundcloud.com/oembed';
     const q = new URLSearchParams({ format: 'json', url: target.url });
-    const res = await fetch(`https://soundcloud.com/oembed?${q}`);
+    const res = await fetch(`${endpoint}?${q}`);
     if (res.ok) {
       const o = await res.json();
-      const artist = o.author_name || '';
+      const artist = (o.author_name || '').replace(/ - Topic$/, '');
       $('#title').textContent = (o.title || '').replace(new RegExp(` by ${artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), '') || 'Untitled';
-      $('#artist').textContent = artist;
-      if (o.thumbnail_url) $('#art').src = o.thumbnail_url.replace('-t500x500.', '-t300x300.');
+      $('#artist').textContent = artist ? `${artist} · ${SDJ.SITE_NAME[target.site]}` : SDJ.SITE_NAME[target.site];
+      if (o.thumbnail_url && !videoId) $('#art').src = o.thumbnail_url.replace('-t500x500.', '-t300x300.');
     }
   } catch {
     /* the preview is a nicety */
@@ -103,6 +116,7 @@ $('#dl').addEventListener('click', async () => {
 
 $('#conn').addEventListener('click', () => status.online && send({ type: 'show' }));
 $('#open-sc').addEventListener('click', () => chrome.tabs.create({ url: 'https://soundcloud.com/discover' }));
+$('#open-yt').addEventListener('click', () => chrome.tabs.create({ url: 'https://www.youtube.com/' }));
 $('#get-app').addEventListener('click', () => chrome.tabs.create({ url: `${SDJ.REPO}/releases/latest` }));
 
 const STATUS_TEXT = {

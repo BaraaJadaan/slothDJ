@@ -8,7 +8,9 @@
 | **Linux** | `slothDJ_…_amd64.AppImage` or `slothDJ_…_amd64.deb` |
 | **Browser extension** (Chrome, Edge, Brave, Opera, Vivaldi) | `slothDJ-extension-….zip` |
 
-On first launch slothDJ downloads its engine once (yt-dlp, plus ffmpeg if you don't already have it, about 50 MB).
+Already on v1.1.0 or newer? slothDJ updates itself: open it and click **Update now** on the banner.
+
+On first launch slothDJ downloads its engine once (yt-dlp, plus ffmpeg if you don't already have it, about 50 MB). YouTube also uses Node.js or Deno; if neither is installed, slothDJ downloads Deno (about 40 MB) the first time you download from YouTube.
 
 The builds aren't code-signed yet:
 - **Windows:** if SmartScreen appears, click **More info → Run anyway**.

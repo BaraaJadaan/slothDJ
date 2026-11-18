@@ -1,35 +1,8 @@
-//! Everything SoundCloud-specific: which links we accept, what kind of thing
-//! they point at, and a fast metadata preview through SoundCloud's public oEmbed API.
-//!
-//! Adding another source later (e.g. YouTube) means adding a sibling module with
-//! the same `parse` / `preview` shape and routing to it in `sources::parse`.
+//! SoundCloud links: which ones we accept, what they point at, and a fast preview
+//! through SoundCloud's public oEmbed API.
 
+use crate::sources::{oembed, Kind, OembedError, Preview, Site, Target};
 use crate::util::http;
-use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Kind {
-    Track,
-    Set,
-    Profile,
-}
-
-#[derive(Clone, Debug)]
-pub struct Target {
-    pub url: String,
-    pub kind: Kind,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Preview {
-    pub url: String,
-    pub kind: Kind,
-    pub title: String,
-    pub artist: String,
-    pub artwork: Option<String>,
-}
 
 /// First path segments that are SoundCloud pages, not users.
 const RESERVED: &[&str] = &[
@@ -47,35 +20,19 @@ const PROFILE_TABS: &[&str] = &[
 /// Third segments that are just sub-pages of a track.
 const TRACK_SUBPAGES: &[&str] = &["recommended", "likes", "reposts", "comments", "sets", "albums"];
 
-const NOT_SOUNDCLOUD: &str = "slothDJ supports SoundCloud links for now.";
+pub fn is_host(host: &str) -> bool {
+    host == "soundcloud.com" || host == "on.soundcloud.com"
+}
 
-/// Validate and normalise a link the user pasted (or the extension sent).
-pub fn parse(input: &str) -> Result<Target, String> {
-    let raw = input.trim();
-    if raw.is_empty() {
-        return Err("Paste a SoundCloud link first.".into());
-    }
-    let with_scheme = if raw.starts_with("http://") || raw.starts_with("https://") {
-        raw.to_string()
-    } else {
-        format!("https://{raw}")
-    };
-    let url = url::Url::parse(&with_scheme).map_err(|_| "That doesn't look like a link.".to_string())?;
-    let host = url.host_str().unwrap_or("").to_ascii_lowercase();
-    let host = host
-        .strip_prefix("www.")
-        .or_else(|| host.strip_prefix("m."))
-        .unwrap_or(&host)
-        .to_string();
+fn target(url: String, kind: Kind) -> Target {
+    Target { url, kind, site: Site::SoundCloud }
+}
 
+pub fn parse(url: &url::Url, host: &str) -> Result<Target, String> {
     if host == "on.soundcloud.com" {
         // Short share link: resolved to a full URL just before downloading.
-        return Ok(Target { url: format!("https://on.soundcloud.com{}", url.path()), kind: Kind::Track });
+        return Ok(target(format!("https://on.soundcloud.com{}", url.path()), Kind::Track));
     }
-    if host != "soundcloud.com" {
-        return Err(NOT_SOUNDCLOUD.into());
-    }
-
     let segs: Vec<&str> = url
         .path_segments()
         .map(|s| s.filter(|x| !x.is_empty()).collect())
@@ -98,32 +55,27 @@ pub fn parse(input: &str) -> Result<Target, String> {
         // /user/track/s-SECRET (private share link)
         _ => (format!("/{}", segs[..3].join("/")), Kind::Track),
     };
-    Ok(Target { url: format!("https://soundcloud.com{path}"), kind })
+    Ok(target(format!("https://soundcloud.com{path}"), kind))
 }
 
 /// Follow an on.soundcloud.com short link to the real page.
-pub fn resolve(target: Target) -> Result<Target, String> {
-    if !target.url.starts_with("https://on.soundcloud.com") {
-        return Ok(target);
+pub fn resolve(t: Target) -> Result<Target, String> {
+    if !t.url.starts_with("https://on.soundcloud.com") {
+        return Ok(t);
     }
     let resp = http()
-        .get(&target.url)
+        .get(&t.url)
         .call()
         .map_err(|_| "Couldn't open that short link.".to_string())?;
-    parse(resp.get_url())
+    crate::sources::parse(resp.get_url())
 }
 
 /// Title, artist and artwork in ~200 ms, without starting the download engine.
-pub fn preview(target: &Target) -> Result<Preview, String> {
-    let target = resolve(target.clone())?;
-    let api = url::Url::parse_with_params(
-        "https://soundcloud.com/oembed",
-        &[("format", "json"), ("url", target.url.as_str())],
-    )
-    .map_err(|e| e.to_string())?;
-    let v: serde_json::Value = match http().get(api.as_str()).call() {
-        Ok(r) => r.into_json().map_err(|e| e.to_string())?,
-        Err(ureq::Error::Status(404 | 403, _)) => {
+pub fn preview(t: &Target) -> Result<Preview, String> {
+    let t = resolve(t.clone())?;
+    let v = match oembed("https://soundcloud.com/oembed", &t.url) {
+        Ok(v) => v,
+        Err(OembedError::Status(404 | 403)) => {
             return Err("Couldn't find that on SoundCloud. It may be private or removed.".into())
         }
         Err(_) => return Err("Couldn't reach SoundCloud. Check your connection.".into()),
@@ -134,7 +86,7 @@ pub fn preview(target: &Target) -> Result<Preview, String> {
         title = stripped.to_string();
     }
     let artwork = v["thumbnail_url"].as_str().map(small_artwork);
-    Ok(Preview { url: target.url, kind: target.kind, title, artist, artwork })
+    Ok(Preview { url: t.url, kind: t.kind, site: Site::SoundCloud, title, artist, artwork })
 }
 
 /// SoundCloud artwork URLs carry their size in the name; ask for a light one.
@@ -151,6 +103,7 @@ pub fn small_artwork(url: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sources::parse;
 
     #[test]
     fn classifies_links() {
@@ -174,8 +127,6 @@ mod tests {
         assert_eq!(t.url, "https://soundcloud.com/forss/flickermood");
 
         assert!(parse("https://soundcloud.com/discover").is_err());
-        assert!(parse("https://example.com/forss").is_err());
-        assert!(parse("").is_err());
     }
 
     #[test]

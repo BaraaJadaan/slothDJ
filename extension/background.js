@@ -45,9 +45,12 @@ async function api(path, init) {
   }
 }
 
-async function getFormat() {
-  const { format } = await chrome.storage.sync.get('format');
-  return format || null;
+/** The quality remembered for this site (empty = the app's default). */
+async function savedFormat(url) {
+  const site = SDJ.classify(url)?.site;
+  const key = SDJ.formatKey(site);
+  const stored = await chrome.storage.sync.get(key);
+  return stored[key] || null;
 }
 
 async function remember(job) {
@@ -60,7 +63,7 @@ async function download(url, format) {
   const res = await api('/api/download', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, format: format ?? (await getFormat()) }),
+    body: JSON.stringify({ url, format: format ?? (await savedFormat(url)) }),
   });
   if (res.ok && res.job) await remember(res.job);
   return res;
@@ -88,21 +91,31 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   return true; // async reply
 });
 
-// Right-click menu on SoundCloud links and pages.
+// Right-click menus. YouTube gets separate audio and video entries.
+const SC_LINKS = ['https://soundcloud.com/*', 'https://m.soundcloud.com/*', 'https://on.soundcloud.com/*'];
+const SC_PAGES = ['https://soundcloud.com/*', 'https://m.soundcloud.com/*'];
+const YT_LINKS = [
+  'https://www.youtube.com/watch*', 'https://m.youtube.com/watch*', 'https://music.youtube.com/watch*',
+  'https://www.youtube.com/shorts/*', 'https://www.youtube.com/playlist*', 'https://music.youtube.com/playlist*',
+  'https://youtu.be/*',
+];
+const YT_PAGES = ['https://www.youtube.com/watch*', 'https://www.youtube.com/shorts/*', 'https://www.youtube.com/playlist*', 'https://music.youtube.com/*'];
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: 'sdj-link',
-      title: 'Download with slothDJ',
-      contexts: ['link'],
-      targetUrlPatterns: ['https://soundcloud.com/*', 'https://m.soundcloud.com/*', 'https://on.soundcloud.com/*'],
-    });
-    chrome.contextMenus.create({
-      id: 'sdj-page',
-      title: 'Download this page with slothDJ',
-      contexts: ['page'],
-      documentUrlPatterns: ['https://soundcloud.com/*', 'https://m.soundcloud.com/*'],
-    });
+    const add = (id, title, contexts, patterns) =>
+      chrome.contextMenus.create({
+        id,
+        title,
+        contexts,
+        ...(contexts[0] === 'link' ? { targetUrlPatterns: patterns } : { documentUrlPatterns: patterns }),
+      });
+    add('sc-link', 'Download with slothDJ', ['link'], SC_LINKS);
+    add('sc-page', 'Download this page with slothDJ', ['page'], SC_PAGES);
+    add('yt-link-audio', 'Download audio with slothDJ (MP3)', ['link'], YT_LINKS);
+    add('yt-link-video', 'Download video with slothDJ (MP4)', ['link'], YT_LINKS);
+    add('yt-page-audio', 'Download audio with slothDJ (MP3)', ['page'], YT_PAGES);
+    add('yt-page-video', 'Download video with slothDJ (MP4)', ['page'], YT_PAGES);
   });
 });
 
@@ -112,10 +125,21 @@ async function flashBadge(text, color) {
   setTimeout(() => chrome.action.setBadgeText({ text: '' }), 2500);
 }
 
+/** Video menu entry: the remembered YouTube video quality, else 1080p. Audio: remembered audio, else app default. */
+async function formatForMenu(menuId, url) {
+  const saved = await savedFormat(url);
+  const isVideo = (f) => !!f && f.startsWith('mp4_');
+  if (menuId.endsWith('-video')) return isVideo(saved) ? saved : 'mp4_1080';
+  // '' (not null) means "the app's default", which is always an audio format.
+  if (menuId.endsWith('-audio')) return isVideo(saved) ? '' : saved || '';
+  return saved;
+}
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  const url = info.menuItemId === 'sdj-link' ? info.linkUrl : info.pageUrl;
+  const id = String(info.menuItemId);
+  const url = id.includes('-link') ? info.linkUrl : info.pageUrl;
   if (!SDJ.classify(url)) return flashBadge('?', '#6f6884');
-  const res = await download(url);
+  const res = await download(url, await formatForMenu(id, url));
   if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: 'sent', url, res }).catch(() => {});
   if (res.ok) flashBadge('✓', '#34d399');
   else flashBadge(res.offline ? 'off' : '!', '#f87171');

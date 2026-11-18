@@ -21,6 +21,14 @@ pub struct Settings {
     pub max_concurrent: u8,
     pub theme: String,
     pub last_update_check: u64,
+    /// Show a system notification when a download finishes in the background.
+    pub notify: bool,
+    /// Closing the window keeps slothDJ running in the tray.
+    pub close_to_tray: bool,
+    /// Mirrors the OS login item; changed through `set_autostart`, not `save_settings`.
+    pub start_with_system: bool,
+    /// The "still running in the tray" tip has been shown once.
+    pub tray_hint_shown: bool,
 }
 
 impl Default for Settings {
@@ -32,6 +40,10 @@ impl Default for Settings {
             max_concurrent: 2,
             theme: "system".into(),
             last_update_check: 0,
+            notify: true,
+            close_to_tray: true,
+            start_with_system: false,
+            tray_hint_shown: false,
         }
     }
 }
@@ -53,6 +65,8 @@ pub struct AppState {
     /// Running yt-dlp processes by job id, so they can be cancelled.
     pub pids: Mutex<HashMap<u64, u32>>,
     pub cancelled: Mutex<HashSet<u64>>,
+    /// An update found by the updater, waiting for the user to install it.
+    pub update: Mutex<Option<tauri_plugin_updater::Update>>,
 }
 
 impl AppState {
@@ -98,6 +112,7 @@ impl AppState {
             port: Mutex::new(None),
             pids: Mutex::new(HashMap::new()),
             cancelled: Mutex::new(HashSet::new()),
+            update: Mutex::new(None),
         })
     }
 

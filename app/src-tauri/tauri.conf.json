@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "slothDJ",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "identifier": "com.baraajadaan.slothdj",
   "build": {
     "frontendDist": "../ui"
@@ -13,28 +13,36 @@
         "label": "main",
         "title": "slothDJ",
         "width": 980,
-        "height": 700,
+        "height": 720,
         "minWidth": 720,
         "minHeight": 540,
         "center": true,
+        "visible": false,
         "decorations": false,
         "dragDropEnabled": false,
         "backgroundColor": "#0E0B16"
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: https://*.sndcdn.com; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; img-src 'self' data: https://*.sndcdn.com https://i.ytimg.com; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "app", "dmg", "appimage", "deb"],
+    "targets": [
+      "nsis",
+      "app",
+      "dmg",
+      "appimage",
+      "deb"
+    ],
+    "createUpdaterArtifacts": false,
     "publisher": "Baraa Jadaan",
     "copyright": "© 2026 Baraa Jadaan. MIT License.",
     "category": "Music",
     "homepage": "https://github.com/BaraaJadaan/slothDJ",
-    "shortDescription": "Tiny, fast SoundCloud downloader",
-    "longDescription": "slothDJ saves SoundCloud tracks, sets and profiles as tagged audio files with artwork. Pairs with the slothDJ browser extension for one-click downloads.",
+    "shortDescription": "Tiny, fast SoundCloud and YouTube downloader",
+    "longDescription": "slothDJ saves SoundCloud tracks, sets and profiles, and YouTube videos and playlists, as tagged MP3s with artwork or as MP4 video. Pairs with the slothDJ browser extension for one-click downloads.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -43,7 +51,9 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
       "nsis": {
         "installMode": "currentUser",
         "installerIcon": "icons/icon.ico"
@@ -56,7 +66,20 @@
   },
   "plugins": {
     "deep-link": {
-      "desktop": { "schemes": ["slothdj"] }
+      "desktop": {
+        "schemes": [
+          "slothdj"
+        ]
+      }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM5NTIzNDA1RjJBRjdDNDcKUldSSGZLL3lCVFJTeVFrZkZYcjQzMTY3N3N3VGtuSEovcWtFVGl6MlR3bkZHa21BOW8xUlhobVUK",
+      "endpoints": [
+        "https://github.com/BaraaJadaan/slothDJ/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }
