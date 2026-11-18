@@ -1,7 +1,7 @@
 {
   "name": "slothdj",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "slothDJ: a tiny, fast SoundCloud downloader (Rust desktop app + browser extension)",
   "scripts": {
     "tauri": "tauri",

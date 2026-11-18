@@ -89,17 +89,27 @@ pub fn clear_finished(app: AppHandle) {
     jobs::clear_finished(&app);
 }
 
+const MISSING: &str = "That file was moved or deleted.";
+
 #[tauri::command]
 pub fn open_path(app: AppHandle, path: String) -> Result<(), String> {
+    // Check first, so a missing file shows our message instead of a Windows error dialog.
+    if !PathBuf::from(&path).exists() {
+        return Err(MISSING.into());
+    }
     app.opener().open_path(path, None::<&str>).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn reveal_path(app: AppHandle, path: String) -> Result<(), String> {
-    if PathBuf::from(&path).exists() {
-        app.opener().reveal_item_in_dir(path).map_err(|e| e.to_string())
-    } else {
-        Err("That file was moved or deleted.".into())
+    let file = PathBuf::from(&path);
+    if file.exists() {
+        return app.opener().reveal_item_in_dir(file).map_err(|e| e.to_string());
+    }
+    // The file is gone, but its folder is still the useful place to land.
+    match file.parent().filter(|dir| dir.is_dir()) {
+        Some(dir) => app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| e.to_string()),
+        None => Err(MISSING.into()),
     }
 }
 

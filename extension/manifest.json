@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "slothDJ",
   "short_name": "slothDJ",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "One-click SoundCloud downloads. Sends tracks, sets and profiles to the slothDJ desktop app.",
   "homepage_url": "https://github.com/BaraaJadaan/slothDJ",
   "icons": {

@@ -247,6 +247,9 @@ fn build_args(job: &Job, out_dir: &str, temp_dir: &str, ffmpeg: &str, embed_art:
     let mut a: Vec<String> = [
         "--ignore-config", "--no-simulate", "--newline", "--progress", "--color", "never",
         "--no-mtime", "--concurrent-fragments", "4", "--retries", "5", "--fragment-retries", "10",
+        // Without this, yt-dlp on Windows writes in the legacy code page and silently
+        // drops characters it can't represent (e.g. Arabic) from everything it prints.
+        "--encoding", "utf-8",
     ]
     .iter()
     .map(|s| s.to_string())
@@ -267,7 +270,8 @@ fn build_args(job: &Job, out_dir: &str, temp_dir: &str, ffmpeg: &str, embed_art:
 
     // Machine-readable progress lines, parsed in `run`.
     push(&["--print", "video:SDJI %(.{title,uploader,thumbnail,playlist_index,n_entries,playlist_count,playlist_title})j"]);
-    push(&["--print", "after_move:SDJF %(filepath)s"]);
+    // JSON (`j`) escapes non-ASCII as \uXXXX, so the path survives any console encoding.
+    push(&["--print", "after_move:SDJF %(filepath)j"]);
     push(&[
         "--progress-template",
         "download:SDJP %(progress.{status,downloaded_bytes,total_bytes,total_bytes_estimate,speed,eta,fragment_index,fragment_count})j",
@@ -286,6 +290,11 @@ fn build_args(job: &Job, out_dir: &str, temp_dir: &str, ffmpeg: &str, embed_art:
     }
     push(&["--", &job.url]);
     a
+}
+
+/// The saved file's path, printed by yt-dlp as a JSON string (see `build_args`).
+fn parse_printed_path(raw: &str) -> String {
+    serde_json::from_str::<String>(raw.trim()).unwrap_or_else(|_| raw.trim().to_string())
 }
 
 fn num(v: &Value, key: &str) -> Option<f64> {
@@ -329,8 +338,6 @@ fn run(app: AppHandle, id: u64) {
 
     let child = command(&ytdlp)
         .args(&args)
-        .env("PYTHONIOENCODING", "utf-8")
-        .env("PYTHONUTF8", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -419,8 +426,8 @@ fn run(app: AppHandle, id: u64) {
                 j.speed = speed;
                 j.eta = eta;
             });
-        } else if let Some(path) = line.strip_prefix("SDJF ") {
-            let path = path.to_string();
+        } else if let Some(rest) = line.strip_prefix("SDJF ") {
+            let path = parse_printed_path(rest);
             update(&app, id, |j| {
                 if !j.files.contains(&path) {
                     j.files.push(path);
@@ -512,6 +519,31 @@ mod tests {
     fn slug_to_title() {
         assert_eq!(pretty_slug("https://soundcloud.com/forss/flickermood"), "Flickermood");
         assert_eq!(pretty_slug("https://soundcloud.com/a/sets/late-night-mix"), "Late Night Mix");
+    }
+
+    #[test]
+    fn keeps_non_latin_file_names() {
+        // Exactly what yt-dlp prints for "Ask The Rhymes سل القوافي".
+        let printed = r#""C:\\Users\\me\\Music\\slothDJ\\Supra_pyx - Ask The Rhymes \u0633\u0644 \u0627\u0644\u0642\u0648\u0627\u0641\u064a.mp3""#;
+        assert_eq!(
+            parse_printed_path(printed),
+            r"C:\Users\me\Music\slothDJ\Supra_pyx - Ask The Rhymes سل القوافي.mp3"
+        );
+        // Plain (non-JSON) output still works.
+        assert_eq!(parse_printed_path("/music/a b.mp3 "), "/music/a b.mp3");
+    }
+
+    #[test]
+    fn asks_ytdlp_for_utf8_and_json_paths() {
+        let job = Job {
+            id: 1, url: "https://soundcloud.com/a/b".into(), kind: Kind::Track, format: "mp3_320".into(),
+            title: String::new(), artist: String::new(), artwork: None, status: Status::Queued, progress: 0.0,
+            speed: None, eta: None, current: None, index: None, total: None, files: vec![], error: None,
+            warning: None, created: 0, source: "app".into(),
+        };
+        let args = build_args(&job, "out", "tmp", "ffmpeg", true).join(" ");
+        assert!(args.contains("--encoding utf-8"));
+        assert!(args.contains("after_move:SDJF %(filepath)j"));
     }
 
     #[test]

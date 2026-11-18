@@ -1,6 +1,6 @@
 [package]
 name = "slothdj"
-version = "1.0.0"
+version = "1.0.1"
 description = "slothDJ: a tiny, fast SoundCloud downloader"
 authors = ["Baraa Jadaan"]
 license = "MIT"
