@@ -24,10 +24,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "slothDJ-extension-${GITHUB_REF_NAME}.zip" \
-            --draft --title "slothDJ ${GITHUB_REF_NAME}" --notes-file .github/release-notes.md
-          id=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --jq ".[] | select(.tag_name == \"${GITHUB_REF_NAME}\") | .id")
+          # Take the id from the create call itself; listing releases right after
+          # creating one can miss a brand-new draft.
+          id=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
+            -f tag_name="$GITHUB_REF_NAME" -f name="slothDJ ${GITHUB_REF_NAME}" \
+            -F draft=true -F body=@.github/release-notes.md --jq .id)
+          test -n "$id" || { echo "::error::Release creation returned no id"; exit 1; }
           echo "id=$id" >> "$GITHUB_OUTPUT"
+          zip="slothDJ-extension-${GITHUB_REF_NAME}.zip"
+          curl -sSf -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/zip" \
+            --data-binary @"$zip" "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/$id/assets?name=$zip" > /dev/null
 
   build:
     needs: create-release
