@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>slothDJ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="titlebar" data-tauri-drag-region>
+      <div class="brand" data-tauri-drag-region>
+        <img src="logo.svg" alt="" width="22" height="22">
+        <span class="wordmark">sloth<b>DJ</b></span>
+      </div>
+      <div class="titlebar-right">
+        <button class="icon-btn" id="btn-settings" title="Settings (Ctrl+,)" aria-label="Settings" data-icon="sliders"></button>
+        <div class="win-controls">
+          <button id="win-min" aria-label="Minimize" data-icon="minus"></button>
+          <button id="win-max" aria-label="Maximize" data-icon="square"></button>
+          <button id="win-close" class="close" aria-label="Close" data-icon="x"></button>
+        </div>
+      </div>
+    </header>
+
+    <main class="scroll">
+      <div class="container">
+        <section class="hero">
+          <h1>Drop a SoundCloud link.</h1>
+          <p class="sub">Tracks, sets and whole profiles, saved as tagged audio with artwork.</p>
+
+          <form id="add-form" class="omnibox" autocomplete="off">
+            <span class="omni-icon" data-icon="link"></span>
+            <input id="url" type="text" spellcheck="false" placeholder="https://soundcloud.com/artist/track" aria-label="SoundCloud link">
+            <button type="button" id="paste" class="ghost-btn" title="Paste from clipboard"><span data-icon="clipboard"></span>Paste</button>
+            <label class="select">
+              <select id="format" aria-label="Quality"></select>
+              <span data-icon="chevron"></span>
+            </label>
+            <button type="submit" id="go" class="primary-btn"><span data-icon="download"></span>Download</button>
+          </form>
+
+          <div class="below-omni">
+            <p id="hint" class="hint" role="status"></p>
+            <div id="preview" class="preview" hidden>
+              <img alt="">
+              <div class="preview-text"><strong></strong><span></span></div>
+              <span class="kind-pill"></span>
+            </div>
+            <button id="clip-chip" class="clip-chip" hidden>
+              <span data-icon="clipboard"></span>
+              <span class="clip-text"></span>
+              <b>Add</b>
+            </button>
+          </div>
+        </section>
+
+        <section class="downloads">
+          <div class="list-head">
+            <h2>Downloads <span id="count" class="count"></span></h2>
+            <div class="list-tools">
+              <div class="segmented" id="filter" role="tablist">
+                <button data-filter="all" class="on">All</button>
+                <button data-filter="active">Active</button>
+                <button data-filter="finished">Finished</button>
+              </div>
+              <button id="clear" class="ghost-btn small">Clear finished</button>
+            </div>
+          </div>
+
+          <div id="engine-card" class="engine-card" hidden>
+            <img src="logo.svg" alt="" class="engine-logo">
+            <div class="engine-body">
+              <strong id="engine-title">Setting up the download engine</strong>
+              <span id="engine-stage"></span>
+              <div class="bar"><div class="fill" id="engine-fill"></div></div>
+            </div>
+            <button id="engine-retry" class="ghost-btn small" hidden>Try again</button>
+          </div>
+
+          <ul id="jobs" class="jobs"></ul>
+
+          <div id="empty" class="empty" hidden>
+            <img src="logo.svg" alt="" class="empty-logo">
+            <h3>Nothing here yet</h3>
+            <p>Paste a link above, drop one onto this window, or hit the <b>slothDJ</b> button on any SoundCloud track.</p>
+            <button class="ghost-btn" id="get-ext"><span data-icon="puzzle"></span>Get the browser extension</button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="statusbar">
+      <button id="folder-btn" class="status-btn" title="Open download folder"><span data-icon="folder"></span><span id="folder-path"></span></button>
+      <div class="status-right">
+        <span id="engine-status" class="status-item"><i class="dot"></i><span></span></span>
+        <span id="ext-status" class="status-item" title="The browser extension sends links to this port"><span data-icon="puzzle"></span><span></span></span>
+      </div>
+    </footer>
+  </div>
+
+  <div id="drawer" class="drawer" hidden>
+    <div class="drawer-backdrop" data-close></div>
+    <aside class="drawer-panel" role="dialog" aria-label="Settings">
+      <header>
+        <h2>Settings</h2>
+        <button class="icon-btn" data-close aria-label="Close settings" data-icon="x"></button>
+      </header>
+      <div class="drawer-body">
+        <h4>Downloads</h4>
+        <div class="row column">
+          <label>Save to</label>
+          <div class="folder-row">
+            <code id="s-dir"></code>
+            <button class="ghost-btn small" id="s-dir-change">Change</button>
+          </div>
+        </div>
+        <div class="row">
+          <label for="s-format">Default quality</label>
+          <label class="select"><select id="s-format"></select><span data-icon="chevron"></span></label>
+        </div>
+        <div class="row">
+          <div><label for="s-art">Embed artwork &amp; tags</label><small>Cover, title and artist inside the file</small></div>
+          <label class="switch"><input type="checkbox" id="s-art"><span></span></label>
+        </div>
+        <div class="row">
+          <label>Parallel downloads</label>
+          <div class="segmented" id="s-parallel">
+            <button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button>
+          </div>
+        </div>
+
+        <h4>Appearance</h4>
+        <div class="row">
+          <label>Theme</label>
+          <div class="segmented" id="s-theme">
+            <button data-v="system">System</button><button data-v="dark">Dark</button><button data-v="light">Light</button>
+          </div>
+        </div>
+
+        <h4>Engine</h4>
+        <div class="row">
+          <div><label>yt-dlp</label><small id="s-ytdlp">…</small></div>
+          <button class="ghost-btn small" id="s-update">Check for updates</button>
+        </div>
+        <div class="row">
+          <div><label>ffmpeg</label><small id="s-ffmpeg">…</small></div>
+          <button class="ghost-btn small" id="s-repair">Repair</button>
+        </div>
+
+        <h4>Browser extension</h4>
+        <div class="row">
+          <div><label>Local port</label><small id="s-port">…</small></div>
+          <button class="ghost-btn small" id="s-ext"><span data-icon="external"></span>Get it</button>
+        </div>
+
+        <div class="about">
+          <img src="logo.svg" alt="" width="40" height="40">
+          <div>
+            <strong>slothDJ <span id="s-version"></span></strong>
+            <small>Slow animal, fast downloads.</small>
+          </div>
+          <button class="ghost-btn small" id="s-github"><span data-icon="external"></span>GitHub</button>
+        </div>
+        <p class="fineprint">Only download music you have the right to keep, such as tracks the artist offers for free or your own uploads.</p>
+      </div>
+    </aside>
+  </div>
+
+  <div id="drop-overlay" class="drop-overlay" hidden><div><span data-icon="download"></span>Drop to download</div></div>
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

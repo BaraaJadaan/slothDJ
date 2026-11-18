@@ -1,0 +1,7 @@
+node_modules/
+app/src-tauri/target/
+app/src-tauri/gen/
+.preview/
+*.log
+.DS_Store
+Thumbs.db

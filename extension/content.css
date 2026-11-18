@@ -1,0 +1,9 @@
+/* slothDJ button, styled on top of SoundCloud's own .sc-button classes so it blends in. */
+.sdj-btn .sdj-ico { display: inline-flex; }
+.sdj-btn .sdj-ico svg { width: 16px; height: 16px; color: #ec4899; }
+.sdj-btn[data-state="busy"] .sdj-ico svg { color: #a78bfa; animation: sdj-spin 0.8s linear infinite; }
+.sdj-btn[data-state="done"] .sdj-ico svg { color: #34d399; }
+.sdj-btn[data-state="error"] .sdj-ico svg { color: #f87171; }
+.sdj-btn.sdj-wide { width: auto !important; display: inline-flex !important; align-items: center; gap: 6px; }
+.sdj-btn .sdj-label { font-variant-numeric: tabular-nums; }
+@keyframes sdj-spin { to { transform: rotate(360deg); } }

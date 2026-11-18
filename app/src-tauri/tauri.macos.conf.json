@@ -1,0 +1,20 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "slothDJ",
+        "width": 980,
+        "height": 700,
+        "minWidth": 720,
+        "minHeight": 540,
+        "center": true,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "dragDropEnabled": false,
+        "backgroundColor": "#0E0B16"
+      }
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "slothDJ",
+  "version": "1.0.0",
+  "identifier": "com.baraajadaan.slothdj",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "slothDJ",
+        "width": 980,
+        "height": 700,
+        "minWidth": 720,
+        "minHeight": 540,
+        "center": true,
+        "decorations": false,
+        "dragDropEnabled": false,
+        "backgroundColor": "#0E0B16"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: https://*.sndcdn.com; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "app", "dmg", "appimage", "deb"],
+    "publisher": "Baraa Jadaan",
+    "copyright": "© 2026 Baraa Jadaan. MIT License.",
+    "category": "Music",
+    "homepage": "https://github.com/BaraaJadaan/slothDJ",
+    "shortDescription": "Tiny, fast SoundCloud downloader",
+    "longDescription": "slothDJ saves SoundCloud tracks, sets and profiles as tagged audio files with artwork. Pairs with the slothDJ browser extension for one-click downloads.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico"
+      }
+    },
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "10.15"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": { "schemes": ["slothdj"] }
+    }
+  }
+}

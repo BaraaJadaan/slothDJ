@@ -1,0 +1,20 @@
+{
+  "name": "slothdj",
+  "private": true,
+  "version": "1.0.0",
+  "description": "slothDJ: a tiny, fast SoundCloud downloader (Rust desktop app + browser extension)",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "test": "cargo test --manifest-path app/src-tauri/Cargo.toml",
+    "icons": "node scripts/render-icons.mjs && tauri icon brand/icon-1024.png",
+    "screenshots": "node scripts/screenshots.mjs"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@tauri-apps/cli": "^2.12.5"
+  },
+  "repository": "github:BaraaJadaan/slothDJ",
+  "license": "MIT"
+}

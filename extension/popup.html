@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>slothDJ</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/logo.svg" alt="" width="30" height="30">
+    <div class="wm">sloth<b>DJ</b></div>
+    <button id="conn" class="pill" title="slothDJ desktop app"><i></i><span>Checking…</span></button>
+  </header>
+
+  <main>
+    <section id="current" class="card" hidden>
+      <img id="art" alt="">
+      <div class="meta">
+        <strong id="title">…</strong>
+        <span id="artist"></span>
+      </div>
+      <span id="kind" class="kind"></span>
+    </section>
+
+    <section id="controls" hidden>
+      <label class="select">
+        <select id="format" aria-label="Quality"></select>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </label>
+      <button id="dl" class="primary">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+        <span>Download</span>
+      </button>
+    </section>
+    <p id="msg" class="msg" hidden></p>
+
+    <section id="not-sc" class="notice" hidden>
+      <p>Open a <b>track</b>, <b>set</b> or <b>profile</b> on SoundCloud, then click here, or use the slothDJ button next to Like and Share.</p>
+      <button id="open-sc" class="ghost">Open SoundCloud</button>
+    </section>
+
+    <section id="offline" class="notice warn" hidden>
+      <p><b>The slothDJ app isn’t running.</b> Open it and downloads start right away.</p>
+      <div class="row">
+        <button id="get-app" class="ghost">Get the app</button>
+      </div>
+    </section>
+
+    <section id="recent-wrap" hidden>
+      <h3>Recent</h3>
+      <ul id="recent"></ul>
+    </section>
+  </main>
+
+  <footer>Tip: right-click any SoundCloud link → <b>Download with slothDJ</b></footer>
+
+  <script src="shared.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
