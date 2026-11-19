@@ -67,5 +67,35 @@ var SDJ = (() => {
     return `slothdj://download?${q}`;
   }
 
-  return { classify, kindLabel, SITE_NAME, REPO, formatKey, deepLink };
+  /** Qualities, same ids as the app. Video only applies to YouTube. */
+  const FORMATS = [
+    { id: 'mp3_320', label: 'MP3 · 320 kbps', short: 'MP3 320', video: false },
+    { id: 'mp3_192', label: 'MP3 · 192 kbps', short: 'MP3 192', video: false },
+    { id: 'mp3_128', label: 'MP3 · 128 kbps', short: 'MP3 128', video: false },
+    { id: 'original', label: 'Original audio', short: 'Original', video: false },
+    { id: 'mp4_best', label: 'MP4 · Best quality', short: 'MP4 Best', video: true },
+    { id: 'mp4_1080', label: 'MP4 · 1080p', short: 'MP4 1080p', video: true },
+    { id: 'mp4_720', label: 'MP4 · 720p', short: 'MP4 720p', video: true },
+    { id: 'mp4_480', label: 'MP4 · 480p', short: 'MP4 480p', video: true },
+  ];
+  const formatInfo = (id) => FORMATS.find((f) => f.id === id);
+  /** The formats a site can use. */
+  const formatsFor = (site) => FORMATS.filter((f) => !f.video || site === 'youtube');
+
+  /**
+   * The quality to use for a site: the one picked in the popup or on the page,
+   * else the app's default (passed in), else MP3 320. Never video for SoundCloud.
+   */
+  async function chosenFormat(site, appDefault) {
+    const key = formatKey(site);
+    const saved = (await chrome.storage.sync.get(key))[key];
+    const ok = (id) => formatsFor(site).some((f) => f.id === id);
+    return [saved, appDefault, 'mp3_320'].find(ok);
+  }
+
+  async function rememberFormat(site, id) {
+    await chrome.storage.sync.set({ [formatKey(site)]: id });
+  }
+
+  return { classify, kindLabel, SITE_NAME, REPO, formatKey, deepLink, FORMATS, formatInfo, formatsFor, chosenFormat, rememberFormat };
 })();

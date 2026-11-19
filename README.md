@@ -100,8 +100,9 @@ SlothDJ keeps that folder up to date when the app updates, so the extension upda
 - **Paste a link:** paste or drag a SoundCloud or YouTube link onto the window, pick a quality and press **Download**. A link sitting on your clipboard is offered automatically when you switch to SlothDJ.
 - **Search:** type a song or artist instead and press **Enter**. Results from YouTube and SoundCloud appear; click **Preview** to listen or watch first, or **Download** on the one you want. A pasted link gets a **Preview** button too.
 - **Removing downloads:** the trash button asks whether to remove the entry from the list only or delete the file too (deleted files go to the Recycle Bin or Trash). Tick **Remember my choice**, or set the default in **Settings → Remove button**.
-- **On SoundCloud:** click the pink SlothDJ button next to Like, Repost and Share, on a track page, a set, or any track in a list.
-- **On YouTube:** click the **SlothDJ** button under the video, next to Like and Share. Pick MP3 or a video quality from the extension's toolbar icon; it remembers your choice.
+- **On SoundCloud:** on a track or set page, click **SlothDJ** next to Like, Repost and Share. Every track in a list gets a small SlothDJ button too.
+- **On YouTube:** click **SlothDJ** under the video, next to Like and Share.
+- **Choosing the quality from the browser:** the SlothDJ button shows the quality it will use (for example *MP3 320*). Click its **▾** to download as something else: MP3 320/192/128 or the original audio, and on YouTube also MP4 video up to 4K. Your pick is remembered separately for SoundCloud and YouTube, and the extension's toolbar popup uses the same setting.
 - **Right-click:** on any SoundCloud link choose **Download with SlothDJ**; on YouTube links choose **Download audio (MP3)** or **Download video (MP4)**.
 - **App not open?** The extension offers to open it, and the download starts as soon as it does.
 

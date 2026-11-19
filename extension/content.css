@@ -1,22 +1,40 @@
-/* SlothDJ button, styled on top of SoundCloud's own .sc-button classes so it blends in. */
-.sdj-btn .sdj-ico { display: inline-flex; }
-.sdj-btn .sdj-ico svg { width: 16px; height: 16px; color: #ec4899; }
-.sdj-btn[data-state="busy"] .sdj-ico svg { color: #a78bfa; animation: sdj-spin 0.8s linear infinite; }
-.sdj-btn[data-state="done"] .sdj-ico svg { color: #34d399; }
-.sdj-btn[data-state="error"] .sdj-ico svg { color: #f87171; }
-.sdj-btn.sdj-wide { width: auto !important; display: inline-flex !important; align-items: center; gap: 6px; }
-.sdj-btn .sdj-label { font-variant-numeric: tabular-nums; }
-@keyframes sdj-spin { to { transform: rotate(360deg); } }
+/* SlothDJ buttons on SoundCloud and YouTube. They borrow each site's own button styles
+   so they look native, with the pink SlothDJ icon so they're easy to spot. */
 
-/* YouTube: a pill that matches YouTube's own buttons in light and dark mode. */
-.sdj-yt-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 36px; padding: 0 16px 0 12px; margin-left: 8px;
-  border: 0; border-radius: 18px; cursor: pointer; white-space: nowrap;
+.sdjx .sdjx-ico { display: inline-flex; }
+.sdjx .sdjx-ico svg { width: 16px; height: 16px; color: #ec4899; }
+.sdjx[data-state="busy"] .sdjx-ico svg { color: #a78bfa; animation: sdjx-spin 0.8s linear infinite; }
+.sdjx[data-state="done"] .sdjx-ico svg { color: #34d399; }
+.sdjx[data-state="error"] .sdjx-ico svg { color: #f87171; }
+.sdjx .sdjx-name { font-variant-numeric: tabular-nums; }
+.sdjx .sdjx-fmt { font-size: 12px; font-weight: 600; color: #ec4899; }
+.sdjx .sdjx-fmt[hidden] { display: none; }
+.sdjx-caret svg { width: 14px; height: 14px; }
+@keyframes sdjx-spin { to { transform: rotate(360deg); } }
+
+/* SoundCloud track/set page: a labelled split button in the Like/Repost/Share bar. */
+.sdjx-split.sdjx-sc { display: inline-flex; vertical-align: top; margin-right: 8px; }
+.sdjx-sc .sdjx-main { display: inline-flex !important; align-items: center; gap: 6px; margin: 0 !important; width: auto !important;
+  border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+.sdjx-sc .sdjx-caret { display: inline-flex !important; align-items: center; justify-content: center; margin: 0 !important;
+  padding-left: 7px !important; padding-right: 7px !important; min-width: 0 !important; width: auto !important;
+  border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important;
+  box-shadow: inset 1px 0 0 rgba(127, 127, 127, 0.35); }
+
+/* SoundCloud lists: compact icon button, widening to show progress. */
+.sdjx-mini.sdjx-wide { width: auto !important; display: inline-flex !important; align-items: center; gap: 6px; }
+
+/* YouTube: a split pill that matches YouTube's own buttons in light and dark mode. */
+.sdjx-split.sdjx-yt {
+  display: inline-flex; align-items: stretch; margin-left: 8px; height: 36px; border-radius: 18px; overflow: hidden;
   background: var(--yt-spec-badge-chip-background, rgba(255, 255, 255, 0.1));
   color: var(--yt-spec-text-primary, #f1f1f1);
-  font: 500 14px/36px "Roboto", "Arial", sans-serif;
+  font: 500 14px/36px "Roboto", "Arial", sans-serif; white-space: nowrap;
 }
-.sdj-yt-btn:hover { background: var(--yt-spec-button-chip-background-hover, rgba(255, 255, 255, 0.2)); }
-.sdj-yt-btn .sdj-ico svg { width: 20px; height: 20px; }
-.sdj-yt-btn .sdj-label { font-variant-numeric: tabular-nums; }
+.sdjx-yt button {
+  all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: inherit;
+}
+.sdjx-yt .sdjx-main { padding: 0 10px 0 12px; }
+.sdjx-yt .sdjx-caret { padding: 0 10px 0 8px; box-shadow: inset 1px 0 0 var(--yt-spec-10-percent-layer, rgba(255, 255, 255, 0.2)); }
+.sdjx-yt button:hover { background: var(--yt-spec-button-chip-background-hover, rgba(255, 255, 255, 0.2)); }
+.sdjx-yt .sdjx-ico svg { width: 20px; height: 20px; }
