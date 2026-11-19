@@ -804,7 +804,7 @@ function renderExtension() {
     ? 'Extension connected'
     : state.port ? `Extension · port ${state.port}` : 'Extension API offline';
   $('#s-ext-label').textContent = installed
-    ? `Installed${s.extensionVersion ? ` · v${s.extensionVersion}` : ''}${outdated ? ' · update available' : ''}`
+    ? `Installed · ${s.extensionVersion ? `v${s.extensionVersion}` : 'older version'}${outdated ? ' · update available' : ''}`
     : 'Not installed yet';
   $('#s-ext').hidden = installed && !outdated;
   $('#s-ext-btn').textContent = outdated ? 'Update' : 'Set up';
@@ -861,6 +861,7 @@ async function openGuide() {
   const outdated = s.extensionSeen && olderThan(s.extensionVersion, state.version);
   $('#guide-title').textContent = outdated ? 'Update the SlothDJ extension' : 'Add SlothDJ to your browser';
   $('#guide-remove').hidden = !outdated;
+  $('#guide-old-note').hidden = !!outdated; // the dedicated step covers it when we know
   $('#guide-path').textContent = 'Preparing…';
   $('#guide-browsers').innerHTML = '';
   guide.hidden = false;

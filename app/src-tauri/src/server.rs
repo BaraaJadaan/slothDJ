@@ -46,6 +46,12 @@ fn origin_allowed(origin: Option<&str>) -> bool {
     }
 }
 
+/// An extension from before 1.2: no Origin and no `?ext=`, but the browser's own
+/// `Sec-Fetch-Site: none` + `Sec-Fetch-Mode: cors` stamp, which web pages can't produce.
+fn looks_like_older_extension(origin: Option<&str>, fetch_site: Option<&str>, fetch_mode: Option<&str>) -> bool {
+    origin.is_none() && fetch_site == Some("none") && fetch_mode == Some("cors")
+}
+
 /// Remember that the browser extension is installed (and its version, sent as `?ext=1.2.0`),
 /// so the app stops suggesting you install it.
 fn note_extension(app: &AppHandle, query: &str) {
@@ -115,7 +121,15 @@ fn handle(app: &AppHandle, port: u16, mut req: Request) {
     // Browsers don't send an Origin header on an extension's plain GET requests, so the
     // `?ext=` tag the extension adds counts too. Web pages were already refused above.
     let from_extension = origin.as_deref().is_some_and(|o| o.contains("-extension://"));
-    if from_extension || query.split('&').any(|kv| kv.starts_with("ext=")) {
+    // Extensions from before 1.2 don't add `?ext=`. Their GETs still stand out: the browser
+    // marks them `Sec-Fetch-Site: none` + `Sec-Fetch-Mode: cors`, which only extensions
+    // produce (web pages can't set these headers, and their CORS requests always carry an Origin).
+    let older_extension = looks_like_older_extension(
+        origin.as_deref(),
+        header(&req, "Sec-Fetch-Site").as_deref(),
+        header(&req, "Sec-Fetch-Mode").as_deref(),
+    );
+    if from_extension || older_extension || query.split('&').any(|kv| kv.starts_with("ext=")) {
         note_extension(app, &query);
     }
 
@@ -182,6 +196,18 @@ fn handle(app: &AppHandle, port: u16, mut req: Request) {
 #[cfg(test)]
 mod tests {
     use super::origin_allowed;
+
+    #[test]
+    fn spots_older_extensions() {
+        use super::looks_like_older_extension as older;
+        // What a 1.1 extension's status check looks like (captured from Edge).
+        assert!(older(None, Some("none"), Some("cors")));
+        // A web page's request always says where it comes from.
+        assert!(!older(Some("https://example.com"), Some("cross-site"), Some("cors")));
+        // Typing the address in the browser, or curl.
+        assert!(!older(None, Some("none"), Some("navigate")));
+        assert!(!older(None, None, None));
+    }
 
     #[test]
     fn only_extensions_and_local_tools() {

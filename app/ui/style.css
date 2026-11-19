@@ -457,3 +457,5 @@ bdi { unicode-bidi: isolate; }
 .danger-btn:hover { background: rgba(248, 113, 113, 0.22); }
 .danger-btn svg.i { width: 15px; height: 15px; }
 .remove-card footer { justify-content: flex-end; }
+
+.steps small + small { margin-top: 4px; }
