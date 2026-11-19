@@ -144,6 +144,9 @@ fn handle(app: &AppHandle, port: u16, mut req: Request) {
             reply(req, 200, json!({
                 "app": "slothDJ",
                 "version": env!("CARGO_PKG_VERSION"),
+                // The newest extension, already waiting in SlothDJ's extension folder:
+                // an older extension reloads itself to pick it up.
+                "extension": crate::extension::bundled_version(app),
                 "ready": ready,
                 "engine": version,
                 "defaultFormat": lock(&st.settings).format,

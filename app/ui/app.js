@@ -785,6 +785,8 @@ const olderThan = (a, b) => {
   for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) < (pb[i] || 0);
   return false;
 };
+/** The extension version this app ships (older apps didn't say, and kept the two in step). */
+const latestExtension = () => state.extensionLatest || state.version;
 const ago = (ms) => {
   const m = Math.round((Date.now() - ms) / 60000);
   return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
@@ -795,14 +797,22 @@ function renderExtension() {
   const s = state.settings;
   if (!s) return;
   const installed = s.extensionSeen && Date.now() - s.extensionSeen < EXT_FRESH_MS;
-  const outdated = installed && olderThan(s.extensionVersion, state.version);
-  $('#get-ext').hidden = !!installed;
+  const outdated = installed && olderThan(s.extensionVersion, latestExtension());
+  // From 1.3.1 the extension reloads itself when SlothDJ has a newer copy ready; older ones
+  // (or one loaded from another folder) need a click, so say so where it's seen.
+  $('#get-ext').hidden = installed && !outdated;
+  $('#get-ext').lastChild.textContent = outdated ? 'Update the browser extension' : 'Add the browser extension';
   $('#empty-text').innerHTML = installed
     ? 'Paste a SoundCloud or YouTube link above, type a song name to search, or use the <b>SlothDJ</b> button on SoundCloud and YouTube.'
     : 'Paste a SoundCloud or YouTube link above, type a song name to search, or hit the <b>SlothDJ</b> button in your browser.';
-  $('#ext-status span:last-child').textContent = installed
-    ? 'Extension connected'
+  $('#ext-status span:last-child').textContent = outdated
+    ? 'Extension update ready'
+    : installed ? 'Extension connected'
     : state.port ? `Extension · port ${state.port}` : 'Extension API offline';
+  $('#ext-status').classList.toggle('attention', !!outdated);
+  $('#ext-status').title = outdated
+    ? `Your browser is running extension v${s.extensionVersion || '?'}; v${latestExtension()} is ready. Click to update it.`
+    : 'The browser extension sends links to this port';
   $('#s-ext-label').textContent = installed
     ? `Installed · ${s.extensionVersion ? `v${s.extensionVersion}` : 'older version'}${outdated ? ' · update available' : ''}`
     : 'Not installed yet';
@@ -858,7 +868,7 @@ function closeGuide() {
 }
 async function openGuide() {
   const s = state.settings;
-  const outdated = s.extensionSeen && olderThan(s.extensionVersion, state.version);
+  const outdated = s.extensionSeen && olderThan(s.extensionVersion, latestExtension());
   $('#guide-title').textContent = outdated ? 'Update the SlothDJ extension' : 'Add SlothDJ to your browser';
   $('#guide-remove').hidden = !outdated;
   $('#guide-old-note').hidden = !!outdated; // the dedicated step covers it when we know
@@ -884,7 +894,7 @@ async function openGuide() {
 function renderGuideStatus() {
   if (guide.hidden) return;
   const s = state.settings;
-  const ok = s.extensionSeen && Date.now() - s.extensionSeen < EXT_FRESH_MS && !olderThan(s.extensionVersion, state.version);
+  const ok = s.extensionSeen && Date.now() - s.extensionSeen < EXT_FRESH_MS && !olderThan(s.extensionVersion, latestExtension());
   const box = $('#guide-status');
   box.classList.toggle('ok', !!ok);
   box.querySelector('.dot').className = `dot ${ok ? 'ok' : 'busy'}`;
@@ -911,6 +921,7 @@ $('#s-ext').addEventListener('click', () => {
   openGuide();
 });
 $('#get-ext').addEventListener('click', openGuide);
+$('#ext-status').addEventListener('click', () => $('#ext-status').classList.contains('attention') && openGuide());
 $('#s-github').addEventListener('click', (e) => {
   e.preventDefault();
   invoke('open_url', { url: REPO });
@@ -1036,6 +1047,7 @@ async function init() {
     .join('');
   $('#s-version').textContent = `v${s.version}`;
   state.version = s.version;
+  state.extensionLatest = s.extensionLatest;
   s.jobs.forEach((j) => state.jobs.set(j.id, j));
   renderSettings();
   renderEngine(s.engine);

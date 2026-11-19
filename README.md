@@ -76,7 +76,7 @@ Works in Chrome, Edge, Brave, Opera, Vivaldi and other Chromium browsers. The ex
 4. Click **Load unpacked**. SlothDJ has already copied the folder's path: click the address bar at the top of the window that opens, press <kbd>Ctrl</kbd>+<kbd>V</kbd> and <kbd>Enter</kbd>, then **Select Folder**.
 5. Pin SlothDJ to your toolbar. The guide turns green as soon as the extension says hello.
 
-SlothDJ keeps that folder up to date when the app updates, so the extension updates with it (your browser picks up the new version the next time it starts). Once the extension is connected, the app stops suggesting it.
+SlothDJ keeps that folder up to date when the app updates, and from extension 1.3.1 on the extension switches to the new version by itself, open SoundCloud and YouTube tabs included. (An older extension picks it up when you click its reload icon or restart the browser.) Once the extension is connected, the app stops suggesting it.
 
 <p align="center">
   <img src="docs/app-guide.png" width="560" alt="SlothDJ's built-in guide for adding the browser extension: open the extensions page, turn on Developer mode, load the folder, pin it">

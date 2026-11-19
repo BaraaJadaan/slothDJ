@@ -16,6 +16,8 @@ use tauri_plugin_opener::OpenerExt;
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     version: &'static str,
+    /// The extension version this app ships, to tell whether the browser's copy is behind.
+    extension_latest: Option<String>,
     platform: &'static str,
     port: Option<u16>,
     settings: Settings,
@@ -33,6 +35,7 @@ pub fn get_state(app: AppHandle) -> Snapshot {
     let engine = lock(&st.engine).info.clone();
     Snapshot {
         version: env!("CARGO_PKG_VERSION"),
+        extension_latest: crate::extension::bundled_version(&app),
         platform: std::env::consts::OS,
         port,
         settings,

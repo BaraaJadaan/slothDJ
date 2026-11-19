@@ -38,6 +38,11 @@ pub fn folder(app: &AppHandle) -> PathBuf {
         .join("browser-extension")
 }
 
+/// The extension version this copy of the app ships (and keeps in its folder).
+pub fn bundled_version(app: &AppHandle) -> Option<String> {
+    manifest_version(&bundled_dir(app)?)
+}
+
 fn manifest_version(dir: &Path) -> Option<String> {
     let text = fs::read_to_string(dir.join("manifest.json")).ok()?;
     let v: serde_json::Value = serde_json::from_str(&text).ok()?;

@@ -263,6 +263,7 @@ svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
 .status-btn svg.i, .status-item svg.i { width: 13px; height: 13px; }
 .status-right { display: flex; align-items: center; gap: 16px; padding-right: 6px; }
 .status-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.status-item.attention { color: var(--warn); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
 .dot.ok { background: var(--ok); box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15); }
 .dot.busy { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; }

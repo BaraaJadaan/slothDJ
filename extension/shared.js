@@ -97,5 +97,15 @@ var SDJ = (() => {
     await chrome.storage.sync.set({ [formatKey(site)]: id });
   }
 
-  return { classify, kindLabel, SITE_NAME, REPO, formatKey, deepLink, FORMATS, formatInfo, formatsFor, chosenFormat, rememberFormat };
+  /** Is version a ("1.3.1") newer than b? */
+  function isNewer(a, b) {
+    const pa = String(a || '0').split('.').map(Number);
+    const pb = String(b || '0').split('.').map(Number);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+    }
+    return false;
+  }
+
+  return { classify, kindLabel, SITE_NAME, REPO, formatKey, deepLink, FORMATS, formatInfo, formatsFor, chosenFormat, rememberFormat, isNewer };
 })();

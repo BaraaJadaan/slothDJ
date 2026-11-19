@@ -25,6 +25,7 @@ async function findPort() {
       const { data } = await call(port, `/api/status?ext=${EXT_VERSION}`);
       if (String(data?.app).toLowerCase() === 'slothdj') {
         knownPort = port;
+        await catchUp(data);
         return { port, status: data };
       }
     } catch {
@@ -33,6 +34,38 @@ async function findPort() {
   }
   knownPort = null;
   return null;
+}
+
+/**
+ * SlothDJ keeps the newest extension in the folder the browser loads it from, but an
+ * unpacked extension only reads new files when it's reloaded. So when the app says a
+ * newer one is ready, reload once to switch to it. Only once per version: if this copy
+ * was loaded from some other folder, reloading changes nothing (the popup explains).
+ */
+async function catchUp(status) {
+  const ready = status?.extension;
+  if (!ready || !SDJ.isNewer(ready, EXT_VERSION)) return;
+  const { reloadedFor } = await chrome.storage.local.get('reloadedFor');
+  if (reloadedFor === ready) return;
+  await chrome.storage.local.set({ reloadedFor: ready });
+  chrome.runtime.reload(); // onInstalled ("update") then brings open tabs over
+}
+
+/**
+ * After an update or reload, put the new SlothDJ button on SoundCloud and YouTube tabs
+ * that are already open, so nobody has to reload them. The copy from before the update stands down
+ * by itself (from 1.3.0 on; 1.2's buttons can't be replaced, so those tabs need a reload).
+ */
+async function refreshOpenTabs(again = true) {
+  const { matches, js, css } = chrome.runtime.getManifest().content_scripts[0];
+  for (const tab of await chrome.tabs.query({ url: matches })) {
+    const target = { tabId: tab.id };
+    // Running it twice is harmless: a page that already has this copy ignores the second.
+    if (again) chrome.scripting.insertCSS({ target, files: css }).catch(() => {});
+    chrome.scripting.executeScript({ target, files: js }).catch(() => {});
+  }
+  // A tab that was still loading during the reload can miss the first pass.
+  if (again) setTimeout(() => refreshOpenTabs(false), 3000);
 }
 
 async function api(path, init) {
@@ -113,8 +146,9 @@ const YT_PAGES = ['https://www.youtube.com/watch*', 'https://www.youtube.com/sho
 let lastHello = 0;
 chrome.runtime.onStartup.addListener(() => findPort());
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(({ reason, previousVersion }) => {
   findPort();
+  if (reason === 'update' && previousVersion && !SDJ.isNewer('1.3.0', previousVersion)) refreshOpenTabs();
   chrome.contextMenus.removeAll(() => {
     const add = (id, title, contexts, patterns) =>
       chrome.contextMenus.create({

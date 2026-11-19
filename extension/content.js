@@ -4,6 +4,14 @@
   const OWNER = chrome.runtime.id;
   if (window.__sdj3) return;
   window.__sdj3 = true;
+  // This copy's mark on everything it adds. After an extension update the new copy runs
+  // next to the old one (which is cut off from the extension), and they must tell their
+  // buttons apart.
+  const INST = Math.random().toString(36).slice(2);
+  const RETIRE = `slothdj-retire:${OWNER}`;
+  // Ask a cut-off copy from before an update to take its buttons away; this one takes over.
+  document.dispatchEvent(new CustomEvent(RETIRE));
+  document.addEventListener(RETIRE, () => alive() || teardown());
 
   const svg = (body, view = 16) =>
     `<svg viewBox="0 0 ${view} ${view}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
@@ -61,6 +69,14 @@
   });
 
   // ---------- Buttons ----------
+  function mark(el) {
+    el.dataset.sdjOwner = OWNER;
+    el.dataset.sdjInst = INST;
+    return el;
+  }
+  /** A button left by this extension's copy from before an update. */
+  const stale = (el) => el.dataset.sdjOwner === OWNER && el.dataset.sdjInst !== INST;
+
   function stopEvent(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -70,7 +86,7 @@
   function makeSplit(url, variant) {
     const wrap = document.createElement('span');
     wrap.className = `sdjx sdjx-split sdjx-${variant}`;
-    wrap.dataset.sdjOwner = OWNER;
+    mark(wrap);
     const sc = variant === 'sc' ? 'sc-button-secondary sc-button sc-button-medium ' : '';
     wrap.innerHTML = `
       <button type="button" class="${sc}sdjx-main"><span class="sdjx-ico"></span><span class="sdjx-name">SlothDJ</span><span class="sdjx-fmt"></span></button>
@@ -92,7 +108,7 @@
     const b = document.createElement('button');
     b.type = 'button';
     b.className = `sc-button-secondary sc-button sc-button-${size} sc-button-icon sc-button-responsive sdjx sdjx-mini`;
-    b.dataset.sdjOwner = OWNER;
+    mark(b);
     b.innerHTML = `<div class="sdjx-ico"></div><span class="sc-button-label sdjx-name"></span>`;
     b.addEventListener('click', (e) => {
       stopEvent(e);
@@ -155,7 +171,9 @@
 
   function scanSoundCloud() {
     document.querySelectorAll('.soundActions .sc-button-group').forEach((group) => {
-      if (group.querySelector(':scope > .sdjx')) return;
+      const existing = group.querySelector(':scope > .sdjx');
+      if (existing && !stale(existing)) return;
+      existing?.remove();
       const url = soundUrl(group);
       if (!url || !SDJ.classify(url)) return;
       if (group.closest('.listenEngagement')) {
@@ -173,7 +191,11 @@
     const target = SDJ.classify(location.href);
     const bar = document.querySelector('ytd-watch-metadata #top-level-buttons-computed');
     if (!target || target.kind !== 'track' || !bar) return;
-    const el = bar.querySelector(':scope > .sdjx');
+    let el = bar.querySelector(':scope > .sdjx');
+    if (el && stale(el)) {
+      el.remove();
+      el = null;
+    }
     if (!el) {
       document.querySelectorAll(`.sdjx-yt[data-sdj-owner="${OWNER}"]`).forEach((n) => n.remove());
       bar.appendChild(makeSplit(target.url, 'yt'));
@@ -183,7 +205,9 @@
     }
   }
 
-  const scan = site === 'youtube' ? scanYouTube : scanSoundCloud;
+  let retired = false;
+  // A copy cut off by an update adds no new buttons; the ones it has say "reload the page".
+  const scan = () => !retired && alive() && (site === 'youtube' ? scanYouTube : scanSoundCloud)();
   let scanTimer;
   const observer = new MutationObserver(() => {
     clearTimeout(scanTimer);
@@ -194,10 +218,22 @@
   scan();
   send({ type: 'hello' });
 
+  /** Stand down for the copy that came with an extension update. */
+  function teardown() {
+    if (retired) return;
+    retired = true;
+    observer.disconnect();
+    clearTimeout(scanTimer);
+    polling.forEach((timer) => clearInterval(timer));
+    polling.clear();
+    closeMenu();
+    document.querySelectorAll(`[data-sdj-inst="${INST}"]`).forEach((n) => n.remove());
+  }
+
   // An older SlothDJ (or a copy cut off by an extension update) is also on this page.
   setTimeout(() => {
     const other = document.querySelector(`.sdj-btn, .sdj-yt-btn, #slothdj-toast-host, [data-sdj-owner]:not([data-sdj-owner="${OWNER}"])`);
-    if (!other || sessionStorage.getItem('sdj-dup-warned')) return;
+    if (retired || !other || sessionStorage.getItem('sdj-dup-warned')) return;
     sessionStorage.setItem('sdj-dup-warned', '1');
     toast({
       tone: 'err',
@@ -216,8 +252,7 @@
   function toggleMenu(anchor) {
     if (menu?.anchor === anchor) return closeMenu();
     closeMenu();
-    const hostEl = document.createElement('div');
-    hostEl.dataset.sdjOwner = OWNER;
+    const hostEl = mark(document.createElement('div'));
     const sh = hostEl.attachShadow({ mode: 'open' });
     const group = (title, list) =>
       list.length
@@ -356,9 +391,8 @@
   // ---------- Card (shadow DOM, so the site's CSS can't touch it) ----------
   function host() {
     if (root) return root;
-    const el = document.createElement('div');
+    const el = mark(document.createElement('div'));
     el.id = 'slothdj-card';
-    el.dataset.sdjOwner = OWNER;
     root = el.attachShadow({ mode: 'open' });
     root.innerHTML = `
       <style>

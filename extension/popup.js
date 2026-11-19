@@ -24,9 +24,12 @@ function renderConnection() {
   pill.querySelector('span').textContent = status.online ? 'App connected' : 'App offline';
   pill.title = status.online ? `SlothDJ ${status.version} · click to open` : 'Start the SlothDJ desktop app';
   $('#offline').hidden = status.online;
+  // Normally the extension reloads itself into the newer copy; still older means that didn't work.
+  const stale = status.online && SDJ.isNewer(status.extension, chrome.runtime.getManifest().version);
+  $('#stale').hidden = !stale;
+  if (stale) $('#stale-v').textContent = status.extension;
 }
 
-/** Quality picker: audio for SoundCloud; audio or video for YouTube. Remembered per site. */
 /** Quality picker: audio for SoundCloud, audio or video for YouTube. It's the same remembered
  *  choice the SlothDJ button on the page uses; until you pick one, it's the app's default. */
 async function renderFormats() {
