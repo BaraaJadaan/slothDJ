@@ -82,9 +82,10 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
           releaseId: ${{ needs.create-release.outputs.id }}
-          # Release builds also produce signed update files and latest.json for the in-app updater.
+          # Release builds also produce signed update files for the in-app updater.
           args: ${{ matrix.args }} --config app/src-tauri/tauri.release.conf.json
-          includeUpdaterJson: true
+          # latest.json is written once in the publish job: parallel builds updating it race each other.
+          includeUpdaterJson: false
 
       - name: Attach the portable Windows exe
         if: matrix.os == 'windows-latest'
@@ -104,6 +105,20 @@ jobs:
     needs: [create-release, build]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Write latest.json for the in-app updater
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.create-release.outputs.id }}
+        run: |
+          node .github/scripts/updater-json.mjs
+          curl -sSf -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @latest.json \
+            "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets?name=latest.json" > /dev/null
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
