@@ -33,7 +33,7 @@ function renderConnection() {
   const pill = $('#conn');
   pill.className = `pill ${status.online ? 'on' : 'off'}`;
   pill.querySelector('span').textContent = status.online ? 'App connected' : 'App offline';
-  pill.title = status.online ? `slothDJ ${status.version} · click to open` : 'Start the slothDJ desktop app';
+  pill.title = status.online ? `SlothDJ ${status.version} · click to open` : 'Start the SlothDJ desktop app';
   $('#offline').hidden = status.online;
 }
 
@@ -67,7 +67,7 @@ async function renderTarget() {
   const videoId = target.url.split('watch?v=')[1];
   if (videoId) $('#art').src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
   const btn = $('#dl');
-  btn.querySelector('span').textContent = status.online ? 'Download' : 'Open slothDJ & download';
+  btn.querySelector('span').textContent = status.online ? 'Download' : 'Open SlothDJ & download';
 
   try {
     const endpoint = target.site === 'youtube' ? 'https://www.youtube.com/oembed' : 'https://soundcloud.com/oembed';
@@ -94,7 +94,7 @@ $('#dl').addEventListener('click', async () => {
   if (!status.online) {
     // Launch the app through its slothdj:// link; it queues the download itself.
     chrome.tabs.update(tab.id, { url: SDJ.deepLink(target.url, format) });
-    label.textContent = 'Opening slothDJ…';
+    label.textContent = 'Opening SlothDJ…';
     setTimeout(() => window.close(), 1200);
     return;
   }
@@ -104,12 +104,12 @@ $('#dl').addEventListener('click', async () => {
   const res = await send({ type: 'download', url: target.url, format });
   if (res.ok) {
     btn.classList.add('sent');
-    label.textContent = 'Sent to slothDJ ✓';
+    label.textContent = 'Sent to SlothDJ ✓';
     renderRecent();
   } else {
     btn.disabled = false;
     label.textContent = 'Download';
-    $('#msg').textContent = res.offline ? 'slothDJ stopped responding. Is it still open?' : res.error || 'Something went wrong.';
+    $('#msg').textContent = res.offline ? 'SlothDJ stopped responding. Is it still open?' : res.error || 'Something went wrong.';
     $('#msg').hidden = false;
   }
 });
@@ -148,7 +148,7 @@ async function renderRecent() {
             ? `${job.index}/${job.total}`
             : `${Math.round(job.progress * 100)}%`
           : STATUS_TEXT[st] || '';
-      li.innerHTML = `<span class="t"></span><span class="s ${st || ''}"></span>`;
+      li.innerHTML = `<span class="t" dir="auto"></span><span class="s ${st || ''}"></span>`;
       li.querySelector('.t').textContent = job?.title || r.title;
       li.querySelector('.s').textContent = text;
       if (job && !['done', 'failed', 'canceled'].includes(st)) {
@@ -157,7 +157,7 @@ async function renderRecent() {
         bar.innerHTML = `<i style="width:${Math.round(job.progress * 100)}%"></i>`;
         li.appendChild(bar);
       }
-      li.title = 'Show in slothDJ';
+      li.title = 'Show in SlothDJ';
       li.addEventListener('click', () => send({ type: 'show' }));
       return li;
     }),

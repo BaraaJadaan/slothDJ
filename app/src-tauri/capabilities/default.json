@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions for the main window. Everything else goes through slothDJ's own Rust commands.",
+  "description": "Permissions for the main window. Everything else goes through SlothDJ's own Rust commands.",
   "windows": ["main"],
   "permissions": [
     "core:default",

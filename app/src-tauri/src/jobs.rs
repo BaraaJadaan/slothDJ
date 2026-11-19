@@ -234,9 +234,9 @@ pub fn refresh_tray(app: &AppHandle) {
     let running = lock(&state(app).jobs).iter().filter(|j| !j.status.is_finished()).count();
     if let Some(tray) = app.tray_by_id("main") {
         let tip = match running {
-            0 => "slothDJ".to_string(),
-            1 => "slothDJ · 1 download".to_string(),
-            n => format!("slothDJ · {n} downloads"),
+            0 => "SlothDJ".to_string(),
+            1 => "SlothDJ · 1 download".to_string(),
+            n => format!("SlothDJ · {n} downloads"),
         };
         let _ = tray.set_tooltip(Some(tip));
     }
@@ -285,6 +285,32 @@ pub fn remove(app: &AppHandle, id: u64) {
     let _ = app.emit("job-removed", id);
     save_history(app);
     refresh_tray(app);
+}
+
+/// Remove a download from the list and move its file(s) to the Recycle Bin / Trash.
+/// Returns how many files were moved. Files that are already gone are skipped.
+pub fn delete_with_files(app: &AppHandle, id: u64) -> Result<usize, String> {
+    let st = state(app);
+    let Some(job) = lock(&st.jobs).iter().find(|j| j.id == id).cloned() else { return Ok(0) };
+    if job.status.is_running() || job.status == Status::Queued {
+        return Err("Cancel the download first.".into());
+    }
+    let out_dir = PathBuf::from(&lock(&st.settings).output_dir);
+    let files: Vec<PathBuf> = job.files.iter().map(PathBuf::from).filter(|p| p.is_file()).collect();
+    trash::delete_all(&files).map_err(|e| {
+        format!("Couldn't delete the file. Is it open in another app? ({e})")
+    })?;
+    // A set's own folder goes too once it's empty (never the main download folder).
+    let mut folders: Vec<PathBuf> = files.iter().filter_map(|f| f.parent().map(PathBuf::from)).collect();
+    folders.dedup();
+    for dir in folders {
+        let is_empty = std::fs::read_dir(&dir).map(|mut d| d.next().is_none()).unwrap_or(false);
+        if is_empty && dir != out_dir && dir.starts_with(&out_dir) {
+            let _ = std::fs::remove_dir(&dir);
+        }
+    }
+    remove(app, id);
+    Ok(files.len())
 }
 
 pub fn clear_finished(app: &AppHandle) {
@@ -422,7 +448,7 @@ fn run(app: AppHandle, id: u64) {
 
     // YouTube needs a JavaScript runtime; the first time may download one.
     let js = if job.site == Site::YouTube {
-        match crate::engine::js_runtime(&app, id) {
+        match crate::engine::js_runtime(&app, Some(id)) {
             Ok(rt) => rt,
             Err(e) => return finish(&app, id, Err(e)),
         }
@@ -642,7 +668,7 @@ fn notify_finished(app: &AppHandle, job: &Job) {
 }
 
 /// Turn yt-dlp's "ERROR: [soundcloud] 123: Unable to …" into something a person can act on.
-fn friendly_error(raw: &str) -> String {
+pub(crate) fn friendly_error(raw: &str) -> String {
     let lower = raw.to_lowercase();
     if lower.contains("404") || lower.contains("not found") || lower.contains("video unavailable") || lower.contains("is unavailable") {
         "Couldn't find this. It may be private or deleted.".into()
@@ -704,10 +730,10 @@ mod tests {
     #[test]
     fn keeps_non_latin_file_names() {
         // Exactly what yt-dlp prints for "Ask The Rhymes سل القوافي".
-        let printed = r#""C:\\Users\\me\\Music\\slothDJ\\Supra_pyx - Ask The Rhymes \u0633\u0644 \u0627\u0644\u0642\u0648\u0627\u0641\u064a.mp3""#;
+        let printed = r#""C:\\Users\\me\\Music\\SlothDJ\\Supra_pyx - Ask The Rhymes \u0633\u0644 \u0627\u0644\u0642\u0648\u0627\u0641\u064a.mp3""#;
         assert_eq!(
             parse_printed_path(printed),
-            r"C:\Users\me\Music\slothDJ\Supra_pyx - Ask The Rhymes سل القوافي.mp3"
+            r"C:\Users\me\Music\SlothDJ\Supra_pyx - Ask The Rhymes سل القوافي.mp3"
         );
         assert_eq!(parse_printed_path("/music/a b.mp3 "), "/music/a b.mp3");
     }

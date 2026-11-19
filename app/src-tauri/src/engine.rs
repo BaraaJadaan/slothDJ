@@ -1,6 +1,6 @@
 //! The download engine: yt-dlp (extraction) + ffmpeg (conversion and tagging).
 //!
-//! Neither is bundled, which keeps the installer tiny. On first launch slothDJ fetches
+//! Neither is bundled, which keeps the installer tiny. On first launch SlothDJ fetches
 //! the official yt-dlp build and a static ffmpeg (or reuses one already on PATH), then
 //! keeps yt-dlp current, since sites change and yt-dlp ships fixes quickly.
 
@@ -11,8 +11,6 @@ use serde::Serialize;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
@@ -27,7 +25,7 @@ pub struct EngineInfo {
     pub stage: String,
     pub progress: f64,
     pub ytdlp_version: Option<String>,
-    /// "system" when an ffmpeg on PATH is reused, "managed" when slothDJ downloaded it.
+    /// "system" when an ffmpeg on PATH is reused, "managed" when SlothDJ downloaded it.
     pub ffmpeg: Option<String>,
     /// JavaScript runtime used for YouTube, e.g. "node (system)" or "deno (managed)".
     pub js: Option<String>,
@@ -178,7 +176,7 @@ fn version_at_least(exe: &Path, major: u64, minor: u64) -> bool {
 }
 
 /// A JavaScript runtime yt-dlp can use, already on this computer: Deno 2.3+ or Node 22+
-/// on PATH, or a Deno that slothDJ downloaded earlier.
+/// on PATH, or a Deno that SlothDJ downloaded earlier.
 fn existing_js(bin_dir: &Path) -> Option<((String, PathBuf), &'static str)> {
     if let Some(p) = which("deno").filter(|p| version_at_least(p, 2, 3)) {
         return Some((("deno".into(), p), "system"));
@@ -203,7 +201,7 @@ fn deno_asset() -> &'static str {
 
 /// The runtime YouTube downloads use. The first YouTube job on a computer without
 /// Node or Deno downloads Deno once (about 40 MB), showing progress on that job.
-pub fn js_runtime(app: &AppHandle, job_id: u64) -> Result<Option<(String, PathBuf)>, String> {
+pub fn js_runtime(app: &AppHandle, job_id: Option<u64>) -> Result<Option<(String, PathBuf)>, String> {
     let _one_at_a_time = JS_SETUP.lock().unwrap_or_else(|e| e.into_inner());
     let st = state(app);
     if let Some(rt) = lock(&st.engine).js.clone().filter(|(_, p)| p.is_file()) {
@@ -212,7 +210,9 @@ pub fn js_runtime(app: &AppHandle, job_id: u64) -> Result<Option<(String, PathBu
     let (rt, source) = match existing_js(&st.paths.bin_dir) {
         Some(found) => found,
         None => {
-            crate::jobs::update(app, job_id, |j| j.note = Some("Setting up YouTube support (one-time, about 40 MB)…".into()));
+            if let Some(id) = job_id {
+                crate::jobs::update(app, id, |j| j.note = Some("Setting up YouTube support (one-time, about 40 MB)…".into()));
+            }
             let managed = st.paths.bin_dir.join(exe_name("deno"));
             let zip_path = st.paths.bin_dir.join("deno.zip");
             let url = format!("https://github.com/denoland/deno/releases/latest/download/{}", deno_asset());
@@ -259,76 +259,168 @@ pub fn repair(app: AppHandle) {
     ensure(app, false);
 }
 
-struct Counting<R> {
-    inner: R,
-    count: Arc<AtomicU64>,
-}
+const DOWNLOAD_ATTEMPTS: u64 = 5;
 
-impl<R: Read> Read for Counting<R> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let n = self.inner.read(buf)?;
-        self.count.fetch_add(n as u64, Ordering::Relaxed);
-        Ok(n)
-    }
-}
-
-/// Download with a few retries: big files from GitHub's CDN occasionally drop mid-way.
+/// Download `url` to `dest`. GitHub's download servers sometimes drop a connection
+/// mid-way, so a failed attempt picks up where it stopped (HTTP Range) instead of
+/// starting over. `.gz` files are unpacked from disk once the download is complete.
 fn download(app: &AppHandle, url: &str, dest: &Path, label: &str, gunzip: bool) -> Result<(), String> {
-    let mut last_err = String::new();
-    for attempt in 1..=3 {
-        match download_once(app, url, dest, label, gunzip) {
-            Ok(()) => return Ok(()),
-            Err(e) => {
-                let _ = fs::remove_file(dest.with_extension("part"));
-                last_err = e;
-                if attempt < 3 {
-                    publish(app, |i| i.stage = format!("{label} · retrying ({attempt} of 2)…"));
-                    std::thread::sleep(Duration::from_secs(2 * attempt));
+    let part = dest.with_extension("part");
+    let _ = fs::remove_file(&part);
+    let mut failure = None;
+    for attempt in 1..=DOWNLOAD_ATTEMPTS {
+        let mut report = |done: u64, total: Option<u64>| {
+            let mb = |b: u64| b as f64 / 1_048_576.0;
+            publish(app, |i| {
+                i.stage = match total {
+                    Some(t) => format!("{label} · {:.0} of {:.0} MB", mb(done), mb(t)),
+                    None => format!("{label} · {:.0} MB", mb(done)),
+                };
+                i.progress = total.map(|t| (done as f64 / t as f64).min(1.0)).unwrap_or(0.0);
+            });
+        };
+        match fetch_into(url, &part, &mut report) {
+            Ok(()) => {
+                failure = None;
+                break;
+            }
+            Err(reason) => {
+                failure = Some(reason);
+                if attempt < DOWNLOAD_ATTEMPTS {
+                    publish(app, |i| i.stage = format!("{label} · connection dropped, resuming…"));
+                    std::thread::sleep(Duration::from_secs(attempt));
                 }
             }
         }
     }
-    Err(last_err)
+    if let Some(reason) = failure {
+        let _ = fs::remove_file(&part);
+        return Err(format!("Couldn't download the engine ({reason}). Check your internet connection and try again."));
+    }
+
+    let finished = if gunzip {
+        let unpack = || -> std::io::Result<()> {
+            let tmp = dest.with_extension("unpacking");
+            let mut out = File::create(&tmp)?;
+            std::io::copy(&mut GzDecoder::new(File::open(&part)?), &mut out)?;
+            out.flush()?;
+            drop(out);
+            fs::rename(&tmp, dest)
+        };
+        unpack().map_err(|e| format!("The download was damaged ({e}). Try again."))
+    } else {
+        fs::rename(&part, dest).map_err(|e| e.to_string())
+    };
+    let _ = fs::remove_file(&part);
+    finished?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(dest, fs::Permissions::from_mode(0o755));
+    }
+    Ok(())
 }
 
-fn download_once(app: &AppHandle, url: &str, dest: &Path, label: &str, gunzip: bool) -> Result<(), String> {
-    let offline = || "Couldn't download the engine. Check your internet connection and try again.".to_string();
-    let resp = http().get(url).call().map_err(|_| offline())?;
-    let total: f64 = resp.header("Content-Length").and_then(|v| v.parse().ok()).unwrap_or(0.0);
-    let count = Arc::new(AtomicU64::new(0));
-    let counted = Counting { inner: resp.into_reader(), count: count.clone() };
-    let mut src: Box<dyn Read> = if gunzip { Box::new(GzDecoder::new(counted)) } else { Box::new(counted) };
+/// A short, human reason for a network error ("timed out", "connection reset", …).
+fn short_reason(err: &str) -> String {
+    let lower = err.to_lowercase();
+    if lower.contains("timed out") || lower.contains("timeout") {
+        "timed out".into()
+    } else if lower.contains("reset") || lower.contains("aborted") || lower.contains("broken pipe") {
+        "connection reset".into()
+    } else if lower.contains("dns") || lower.contains("resolve") || lower.contains("lookup") {
+        "no internet connection".into()
+    } else {
+        err.chars().take(80).collect()
+    }
+}
 
-    let tmp = dest.with_extension("part");
-    let mut file = File::create(&tmp).map_err(|e| e.to_string())?;
+/// One attempt: continue `part` from its current size until the server's file is complete.
+/// `progress(done, total)` is called a few times a second.
+fn fetch_into(url: &str, part: &Path, progress: &mut dyn FnMut(u64, Option<u64>)) -> Result<(), String> {
+    let have = fs::metadata(part).map(|m| m.len()).unwrap_or(0);
+    let mut request = http().get(url);
+    if have > 0 {
+        request = request.set("Range", &format!("bytes={have}-"));
+    }
+    let resp = match request.call() {
+        Ok(r) => r,
+        Err(ureq::Error::Status(416, _)) => {
+            // The server won't resume this one: start the file over next time.
+            let _ = fs::remove_file(part);
+            return Err("download restarted".into());
+        }
+        Err(ureq::Error::Status(code, _)) => return Err(format!("server answered {code}")),
+        Err(e) => return Err(short_reason(&e.to_string())),
+    };
+    let resumed = have > 0 && resp.status() == 206;
+    let start = if resumed { have } else { 0 };
+    let total = resp.header("Content-Length").and_then(|v| v.parse::<u64>().ok()).map(|n| n + start);
+    let mut file = if resumed { fs::OpenOptions::new().append(true).open(part) } else { File::create(part) }
+        .map_err(|e| e.to_string())?;
+    let mut src = resp.into_reader();
+    let mut done = start;
     let mut buf = vec![0u8; 128 * 1024];
     let mut last = Instant::now() - Duration::from_secs(1);
-    let mb = |b: f64| b / 1_048_576.0;
     loop {
-        let n = src.read(&mut buf).map_err(|_| offline())?;
+        let n = src.read(&mut buf).map_err(|e| short_reason(&e.to_string()))?;
         if n == 0 {
             break;
         }
         file.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+        done += n as u64;
         if last.elapsed() > Duration::from_millis(150) {
             last = Instant::now();
-            let done = count.load(Ordering::Relaxed) as f64;
-            publish(app, |i| {
-                i.stage = if total > 0.0 {
-                    format!("{label} · {:.0} of {:.0} MB", mb(done), mb(total))
-                } else {
-                    format!("{label} · {:.0} MB", mb(done))
-                };
-                i.progress = if total > 0.0 { (done / total).min(1.0) } else { 0.0 };
-            });
+            progress(done, total);
         }
     }
     file.flush().map_err(|e| e.to_string())?;
-    drop(file);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = fs::set_permissions(&tmp, fs::Permissions::from_mode(0o755));
+    match total {
+        Some(t) if done < t => Err("connection closed early".into()),
+        _ => Ok(()),
     }
-    fs::rename(&tmp, dest).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A server that promises 1 MB, hangs up after 300 KB, then serves the rest on a Range request.
+    #[test]
+    fn resumes_after_a_dropped_connection() {
+        let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+        let port = server.server_addr().to_ip().unwrap().port();
+        let body: Vec<u8> = (0..1_000_000u32).map(|i| (i % 251) as u8).collect();
+        let served = body.clone();
+        std::thread::spawn(move || {
+            for (n, req) in server.incoming_requests().enumerate() {
+                if n == 0 {
+                    let mut raw = req.into_writer();
+                    let _ = write!(raw, "HTTP/1.1 200 OK
+Content-Length: {}
+Connection: close
+
+", served.len());
+                    let _ = raw.write_all(&served[..300_000]);
+                    let _ = raw.flush();
+                } else {
+                    let range = req.headers().iter().find(|h| h.field.equiv("Range")).map(|h| h.value.to_string()).unwrap();
+                    let from: usize = range.trim_start_matches("bytes=").trim_end_matches('-').parse().unwrap();
+                    let resp = tiny_http::Response::from_data(served[from..].to_vec()).with_status_code(206);
+                    let _ = req.respond(resp);
+                }
+            }
+        });
+
+        let dir = std::env::temp_dir().join(format!("slothdj-resume-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let part = dir.join("file.part");
+        let url = format!("http://127.0.0.1:{port}/file");
+
+        assert!(fetch_into(&url, &part, &mut |_, _| {}).is_err(), "first attempt is cut off");
+        assert_eq!(fs::metadata(&part).unwrap().len(), 300_000, "keeps what arrived");
+        fetch_into(&url, &part, &mut |_, _| {}).expect("second attempt resumes");
+        assert_eq!(fs::read(&part).unwrap(), body, "the resumed file is identical");
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

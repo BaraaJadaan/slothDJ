@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Package the browser extension
-        run: cd extension && zip -r "../slothDJ-extension-${GITHUB_REF_NAME}.zip" . -x '.*'
+        run: cd extension && zip -r "../SlothDJ-extension-${GITHUB_REF_NAME}.zip" . -x '.*'
 
       - name: Create draft release
         id: create
@@ -27,11 +27,11 @@ jobs:
           # Take the id from the create call itself; listing releases right after
           # creating one can miss a brand-new draft.
           id=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
-            -f tag_name="$GITHUB_REF_NAME" -f name="slothDJ ${GITHUB_REF_NAME}" \
+            -f tag_name="$GITHUB_REF_NAME" -f name="SlothDJ ${GITHUB_REF_NAME}" \
             -F draft=true -F body=@.github/release-notes.md --jq .id)
           test -n "$id" || { echo "::error::Release creation returned no id"; exit 1; }
           echo "id=$id" >> "$GITHUB_OUTPUT"
-          zip="slothDJ-extension-${GITHUB_REF_NAME}.zip"
+          zip="SlothDJ-extension-${GITHUB_REF_NAME}.zip"
           curl -sSf -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/zip" \
             --data-binary @"$zip" "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/$id/assets?name=$zip" > /dev/null
 
@@ -92,7 +92,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          name="slothDJ_${GITHUB_REF_NAME#v}_x64_portable.exe"
+          name="SlothDJ_${GITHUB_REF_NAME#v}_x64_portable.exe"
           cp app/src-tauri/target/release/slothdj.exe "$name"
           curl -sSf -X POST \
             -H "Authorization: Bearer $GH_TOKEN" \

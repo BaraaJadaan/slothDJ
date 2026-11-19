@@ -1,5 +1,5 @@
 'use strict';
-// slothDJ UI. Plain JS, no build step; talks to the Rust core through Tauri's invoke/events.
+// SlothDJ UI. Plain JS, no build step; talks to the Rust core through Tauri's invoke/events.
 
 const T = window.__TAURI__;
 const invoke = (cmd, args) => T.core.invoke(cmd, args);
@@ -43,6 +43,8 @@ function setIcon(el, name) {
 
 // ---------- Helpers ----------
 const $ = (sel, root = document) => root.querySelector(sel);
+/** User text (titles, artists, errors) in its own direction bubble, so Arabic/Hebrew can't reorder what's around it. */
+const iso = (s) => `<bdi>${esc(s)}</bdi>`;
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const RUNNING = ['starting', 'downloading', 'converting'];
 const FINISHED = ['done', 'failed', 'canceled'];
@@ -182,6 +184,7 @@ function kindLabel(kind, site, format) {
   return '';
 }
 
+let previewItem = null;
 function showPreview(p) {
   const img = preview.querySelector('img');
   if (p.artwork) {
@@ -195,10 +198,12 @@ function showPreview(p) {
   preview.querySelector('strong').textContent = p.title || 'Untitled';
   preview.querySelector('.preview-text span').innerHTML = [
     `<span class="site site-${p.site}">${SITE_NAME[p.site]}</span>`,
-    esc(p.artist),
+    p.artist ? iso(p.artist) : '',
   ].filter(Boolean).join(' · ');
+  previewItem = p;
   const label = p.kind === 'track' ? (p.site === 'youtube' ? 'Video' : 'Track') : kindLabel(p.kind, p.site);
   preview.querySelector('.kind-pill').textContent = label;
+  $('#preview-play').hidden = p.site === 'youtube' && p.kind !== 'track';
   preview.hidden = false;
 }
 
@@ -288,7 +293,7 @@ async function runSearch(query) {
   const seq = ++searchSeq;
   setHint('');
   results.hidden = false;
-  $('#results-title').textContent = `Results for “${query}”`;
+  $('#results-title').innerHTML = `Results for “${iso(query)}”`;
   $('#results-body').innerHTML = `<div class="results-loading">Searching SoundCloud and YouTube…<div class="bar"><div class="fill"></div></div></div>`;
   let hits;
   try {
@@ -309,13 +314,19 @@ async function runSearch(query) {
       .map(
         (h, i) => `<div class="hit ${site === 'soundcloud' ? 'sc' : ''}" data-site="${site}" data-i="${hits.indexOf(h)}">
           <img alt="" ${h.artwork ? `src="${esc(h.artwork)}"` : ''}>
-          <div class="hit-text"><strong title="${esc(h.title)}">${esc(h.title)}</strong><span>${[esc(h.artist), fmtDuration(h.duration)].filter(Boolean).join(' · ')}</span></div>
-          <button class="ghost-btn small" data-hit="${hits.indexOf(h)}">${icon('download')}Download</button>
+          <div class="hit-text"><strong dir="auto" title="${esc(h.title)}">${esc(h.title)}</strong><span>${[h.artist ? iso(h.artist) : '', fmtDuration(h.duration)].filter(Boolean).join(' · ')}</span></div>
+          <div class="hit-actions">
+            <button class="ghost-btn small" data-play="${hits.indexOf(h)}" title="Listen or watch before downloading">${icon('play')}Preview</button>
+            <button class="ghost-btn small" data-hit="${hits.indexOf(h)}">${icon('download')}Download</button>
+          </div>
         </div>`,
       )
       .join('')}</div>`;
   };
   $('#results-body').innerHTML = group('youtube') + group('soundcloud');
+  $('#results-body').querySelectorAll('[data-play]').forEach((b) =>
+    b.addEventListener('click', () => openPlayer({ ...hits[Number(b.dataset.play)], kind: 'track' })),
+  );
   $('#results-body').querySelectorAll('[data-hit]').forEach((b) =>
     b.addEventListener('click', async () => {
       const hit = hits[Number(b.dataset.hit)];
@@ -330,6 +341,127 @@ async function runSearch(query) {
     }),
   );
 }
+
+// ---------- Removing downloads ----------
+const trashName = () => (state.platform === 'windows' ? 'Recycle Bin' : 'Trash');
+let removeTarget = null;
+
+/** Remove a download, following Settings → "Remove button" (ask / keep the file / delete the file). */
+async function removeJob(job, choice) {
+  const hasFiles = job.status === 'done' && job.files.length > 0;
+  if (!hasFiles) return invoke('remove_job', { id: job.id });
+  const action = choice || state.settings.removeAction || 'ask';
+  if (action === 'ask') return askRemove(job);
+  const deleteFiles = action === 'file';
+  const n = await invoke('remove_job', { id: job.id, deleteFiles });
+  if (deleteFiles) toast(n ? `Moved ${n} file${n === 1 ? '' : 's'} to the ${trashName()}.` : 'Removed. The file was already gone.');
+}
+
+function askRemove(job) {
+  removeTarget = job;
+  const n = job.files.length;
+  $('#remove-name').textContent = job.title || '';
+  $('#remove-file-label').textContent = n > 1 ? `Delete ${n} files too` : 'Delete file too';
+  $('#remove-explain').textContent = `Deleted files go to the ${trashName()}, so you can still restore them.`;
+  $('#remove-remember').checked = false;
+  $('#remove-dialog').hidden = false;
+  $('#remove-list').focus();
+}
+function closeRemove() {
+  $('#remove-dialog').hidden = true;
+  removeTarget = null;
+}
+async function confirmRemove(action) {
+  const job = removeTarget;
+  if (!job) return;
+  if ($('#remove-remember').checked) await saveSettings({ removeAction: action });
+  closeRemove();
+  try {
+    await removeJob(job, action);
+  } catch (e) {
+    toast(String(e), true);
+  }
+}
+$('#remove-dialog').addEventListener('click', (e) => e.target.closest('[data-close-remove]') && closeRemove());
+$('#remove-list').addEventListener('click', () => confirmRemove('list'));
+$('#remove-file').addEventListener('click', () => confirmRemove('file'));
+
+// ---------- Preview player ----------
+let playerItem = null;
+let playerSeq = 0;
+
+function closePlayer() {
+  playerSeq++;
+  $('#player').hidden = true;
+  $('#player-stage').innerHTML = ''; // removing the media element stops playback
+  playerItem = null;
+}
+
+function playerMessage(text, isErr) {
+  const box = $('#player-stage .loading');
+  if (!box) return;
+  box.classList.toggle('err', !!isErr);
+  box.textContent = text;
+}
+
+function updatePlayerDownload() {
+  const fmt = $('#format').value;
+  // SoundCloud is audio-only: a video pick falls back to the default audio quality.
+  const effective =
+    playerItem?.site === 'soundcloud' && isVideoFormat(fmt)
+      ? isVideoFormat(state.settings.format) ? 'mp3_320' : state.settings.format
+      : fmt;
+  $('#player-download-label').textContent = `Download · ${formatLabel(effective)}`;
+  $('#player-note').textContent = playerItem?.site === 'youtube' ? 'The preview plays in low quality; the download uses your choice.' : '';
+}
+
+async function openPlayer(item) {
+  const seq = ++playerSeq;
+  playerItem = item;
+  $('#player-title').textContent = item.title || 'Preview';
+  $('#player-sub').innerHTML = [`<span class="site site-${item.site}">${SITE_NAME[item.site]}</span>`, item.artist ? iso(item.artist) : '']
+    .filter(Boolean)
+    .join(' · ');
+  const stage = $('#player-stage');
+  stage.className = `player-stage${item.site === 'soundcloud' ? ' widget' : ''}`;
+  stage.innerHTML = `${item.artwork ? `<img class="poster" alt="" src="${esc(item.artwork)}">` : ''}
+    <div class="loading"><div class="spinner"></div>${item.site === 'youtube' ? 'Getting a preview from YouTube…' : 'Loading the SoundCloud player…'}</div>`;
+  updatePlayerDownload();
+  $('#player').hidden = false;
+  let stream;
+  try {
+    stream = await invoke('preview_stream', { url: item.url });
+  } catch (e) {
+    if (seq === playerSeq) playerMessage(String(e), true);
+    return;
+  }
+  if (seq !== playerSeq) return;
+  if (stream.kind === 'widget') {
+    stage.innerHTML = `<iframe src="${esc(stream.src)}" allow="autoplay; encrypted-media" title="SoundCloud player"></iframe>`;
+  } else {
+    const video = document.createElement('video');
+    Object.assign(video, { src: stream.src, controls: true, autoplay: true, playsInline: true });
+    video.addEventListener('error', () => {
+      stage.innerHTML = `<div class="loading err">This one can't be previewed here, but you can still download it.</div>`;
+    });
+    stage.replaceChildren(video);
+  }
+}
+
+$('#player').addEventListener('click', (e) => e.target.closest('[data-close-player]') && closePlayer());
+$('#player-download').addEventListener('click', async () => {
+  if (!playerItem) return;
+  const item = playerItem;
+  try {
+    await addLink(item.url);
+    closePlayer();
+    toast(`Added: ${item.title || 'download'}`);
+  } catch (e) {
+    toast(String(e), true);
+  }
+});
+$('#preview-play').addEventListener('click', () => previewItem && openPlayer(previewItem));
+$('#format').addEventListener('change', updatePlayerDownload);
 
 // ---------- Download list ----------
 const list = $('#jobs');
@@ -381,9 +513,9 @@ function statusText(j) {
     case 'queued':
       return state.engine.ready ? 'Waiting for a free slot…' : 'Waiting for the engine…';
     case 'starting':
-      return esc(j.note) || 'Starting…';
+      return j.note ? iso(j.note) : 'Starting…';
     case 'downloading':
-      if (setPrefix) return [setPrefix, esc(j.current), fmtSpeed(j.speed)].filter(Boolean).join(' · ');
+      if (setPrefix) return [setPrefix, j.current ? iso(j.current) : '', fmtSpeed(j.speed)].filter(Boolean).join(' · ');
       return [`${Math.round(j.progress * 100)}%`, fmtSpeed(j.speed), fmtEta(j.eta)].filter(Boolean).join(' · ');
     case 'converting': {
       const what = video ? 'Merging video and sound…' : j.format === 'original' ? 'Finishing up…' : 'Converting to MP3…';
@@ -393,17 +525,20 @@ function statusText(j) {
       const n = j.files.length;
       const things = video ? 'video' : j.site === 'youtube' ? 'file' : 'track';
       let text = j.kind === 'track' ? `Saved · ${esc(formatLabel(j.format))}` : `${n} ${things}${n === 1 ? '' : 's'} saved`;
-      if (j.warning) text += ` <span class="warn">· ${esc(j.warning)}</span>`;
+      if (j.warning) text += ` <span class="warn">· ${iso(j.warning)}</span>`;
       return text;
     }
     case 'failed':
-      return esc(j.error || 'Download failed.');
+      return iso(j.error || 'Download failed.');
     case 'canceled':
       return 'Canceled';
     default:
       return '';
   }
 }
+
+const removeTitle = () =>
+  ({ ask: 'Remove…', list: 'Remove from list (keeps the file)', file: 'Remove and delete the file' })[state.settings?.removeAction] || 'Remove…';
 
 const btn = (action, ic, title, cls = '') =>
   `<button class="icon-btn ${cls}" data-action="${action}" title="${title}" aria-label="${title}">${icon(ic)}</button>`;
@@ -415,7 +550,7 @@ function actionsFor(j) {
     return (
       (file && j.kind === 'track' ? btn('play', 'play', 'Play') : '') +
       (file ? btn('reveal', 'folder', 'Show in folder') : '') +
-      btn('remove', 'trash', 'Remove from list', 'danger')
+      btn('remove', 'trash', removeTitle(), 'danger')
     );
   }
   return btn('retry', 'retry', 'Retry') + btn('remove', 'trash', 'Remove from list', 'danger');
@@ -442,6 +577,7 @@ function patchJob(li, j) {
   const title = li.querySelector('.job-title strong');
   title.textContent = j.title || 'Untitled';
   title.title = j.title || '';
+  title.dir = 'auto';
   const pill = li.querySelector('.kind-pill');
   const label = kindLabel(j.kind, j.site, j.format);
   pill.hidden = !label;
@@ -449,8 +585,8 @@ function patchJob(li, j) {
 
   const meta = [
     `<span class="site site-${j.site}">${SITE_NAME[j.site] || ''}</span>`,
-    j.artist ? esc(j.artist) : '',
-    `<span class="job-status">${statusText(j)}</span>`,
+    j.artist ? iso(j.artist) : '',
+    `<bdi dir="ltr" class="job-status">${statusText(j)}</bdi>`,
   ].filter(Boolean);
   li.querySelector('.job-meta').innerHTML = meta.join('<span class="sep">•</span>');
 
@@ -475,7 +611,7 @@ list.addEventListener('click', async (e) => {
     switch (b.dataset.action) {
       case 'cancel': await invoke('cancel_job', { id }); break;
       case 'retry': await invoke('retry_job', { id }); break;
-      case 'remove': await invoke('remove_job', { id }); break;
+      case 'remove': await removeJob(job); break;
       case 'play': await invoke('open_path', { path: job.files[0] }); break;
       case 'reveal': await invoke('reveal_path', { path: job.files[0] }); break;
     }
@@ -581,14 +717,14 @@ function renderEngine(e) {
 
   $('#s-ytdlp').textContent = e.ytdlpVersion ? `Version ${e.ytdlpVersion}` : e.busy ? e.stage : 'Not installed yet';
   $('#s-ffmpeg').textContent =
-    e.ffmpeg === 'system' ? 'Using the copy already on this computer' : e.ffmpeg === 'managed' ? 'Managed by slothDJ' : '…';
+    e.ffmpeg === 'system' ? 'Using the copy already on this computer' : e.ffmpeg === 'managed' ? 'Managed by SlothDJ' : '…';
   const js = e.js || '';
   $('#s-js').textContent = js.startsWith('node')
     ? 'Uses Node.js, already on this computer'
     : js.startsWith('deno (system')
       ? 'Uses Deno, already on this computer'
       : js.startsWith('deno')
-        ? 'Uses Deno, downloaded by slothDJ'
+        ? 'Uses Deno, downloaded by SlothDJ'
         : 'Set up automatically on your first YouTube download';
   state.jobs.forEach((j) => j.status === 'queued' && renderJob(j));
 }
@@ -618,7 +754,18 @@ function renderSettings() {
   $('#s-autostart').checked = s.startWithSystem;
   segment('#s-parallel', String(s.maxConcurrent));
   segment('#s-theme', s.theme);
+  segment('#s-remove', s.removeAction || 'ask');
+  $('#s-remove-hint').textContent = {
+    ask: 'Asks each time whether to delete the file',
+    list: 'Removes it from the list and keeps the file',
+    file: `Also moves the file to the ${trashName()}`,
+  }[s.removeAction || 'ask'];
+  document.querySelectorAll('[data-action="remove"]').forEach((b) => {
+    b.title = removeTitle();
+    b.setAttribute('aria-label', removeTitle());
+  });
   applyTheme();
+  renderExtension();
 }
 async function saveSettings(patch) {
   state.settings = await invoke('save_settings', { settings: { ...state.settings, ...patch } });
@@ -626,8 +773,45 @@ async function saveSettings(patch) {
 }
 function renderPort(port) {
   state.port = port;
-  $('#ext-status span:last-child').textContent = port ? `Extension · port ${port}` : 'Extension API offline';
   $('#s-port').textContent = port ? `Listening on 127.0.0.1:${port}` : 'Not listening';
+  renderExtension();
+}
+
+const EXT_FRESH_MS = 30 * 24 * 60 * 60 * 1000;
+/** Newer-than check for "1.2.0"-style versions. */
+const olderThan = (a, b) => {
+  const pa = String(a || '0').split('.').map(Number);
+  const pb = String(b || '0').split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) < (pb[i] || 0);
+  return false;
+};
+const ago = (ms) => {
+  const m = Math.round((Date.now() - ms) / 60000);
+  return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+};
+
+/** Once the extension has checked in, stop suggesting it; suggest updating it if it's older than the app. */
+function renderExtension() {
+  const s = state.settings;
+  if (!s) return;
+  const installed = s.extensionSeen && Date.now() - s.extensionSeen < EXT_FRESH_MS;
+  const outdated = installed && olderThan(s.extensionVersion, state.version);
+  $('#get-ext').hidden = !!installed;
+  $('#empty-text').innerHTML = installed
+    ? 'Paste a SoundCloud or YouTube link above, type a song name to search, or use the <b>SlothDJ</b> button on SoundCloud and YouTube.'
+    : 'Paste a SoundCloud or YouTube link above, type a song name to search, or hit the <b>SlothDJ</b> button in your browser.';
+  $('#ext-status span:last-child').textContent = installed
+    ? 'Extension connected'
+    : state.port ? `Extension · port ${state.port}` : 'Extension API offline';
+  $('#s-ext-label').textContent = installed
+    ? `Installed${s.extensionVersion ? ` · v${s.extensionVersion}` : ''}${outdated ? ' · update available' : ''}`
+    : 'Not installed yet';
+  $('#s-ext').hidden = installed && !outdated;
+  $('#s-ext-btn').textContent = outdated ? 'Update' : 'Set up';
+  renderGuideStatus();
+  $('#s-port').textContent = installed
+    ? `Last seen ${ago(s.extensionSeen)} · port ${state.port ?? '…'}`
+    : state.port ? `Listening on 127.0.0.1:${state.port}` : 'Not listening';
 }
 
 $('#s-format').addEventListener('change', (e) => {
@@ -649,6 +833,10 @@ $('#s-parallel').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (b) saveSettings({ maxConcurrent: Number(b.dataset.v) });
 });
+$('#s-remove').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (b) saveSettings({ removeAction: b.dataset.v });
+});
 $('#s-theme').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (b) saveSettings({ theme: b.dataset.v });
@@ -663,9 +851,65 @@ $('#s-update').addEventListener('click', () =>
 $('#s-repair').addEventListener('click', () =>
   invoke('repair_engine').then(() => toast('Re-downloading the engine…')).catch((err) => toast(String(err), true)),
 );
-const openExt = () => invoke('open_url', { url: `${REPO}#browser-extension` });
-$('#s-ext').addEventListener('click', openExt);
-$('#get-ext').addEventListener('click', openExt);
+// ---------- Browser extension setup guide ----------
+const guide = $('#ext-guide');
+function closeGuide() {
+  guide.hidden = true;
+}
+async function openGuide() {
+  const s = state.settings;
+  const outdated = s.extensionSeen && olderThan(s.extensionVersion, state.version);
+  $('#guide-title').textContent = outdated ? 'Update the SlothDJ extension' : 'Add SlothDJ to your browser';
+  $('#guide-remove').hidden = !outdated;
+  $('#guide-path').textContent = 'Preparing…';
+  $('#guide-browsers').innerHTML = '';
+  guide.hidden = false;
+  renderGuideStatus();
+  try {
+    const setup = await invoke('extension_setup');
+    $('#guide-path').textContent = setup.folder;
+    $('#guide-path').title = setup.folder;
+    $('#guide-browsers').innerHTML = setup.browsers
+      .map((b) => `<button class="ghost-btn small" data-browser="${b.id}">${icon('external')}Open in ${esc(b.name)}</button>`)
+      .join('');
+    $('#guide-browsers-hint').innerHTML = setup.browsers.length
+      ? 'Or type <code>chrome://extensions</code> in the address bar (<code>edge://extensions</code> in Edge).'
+      : 'Type <code>chrome://extensions</code> in your browser’s address bar (<code>edge://extensions</code> in Edge).';
+    toast('Folder path copied. Paste it in step 3.');
+  } catch (e) {
+    $('#guide-path').textContent = String(e);
+  }
+}
+function renderGuideStatus() {
+  if (guide.hidden) return;
+  const s = state.settings;
+  const ok = s.extensionSeen && Date.now() - s.extensionSeen < EXT_FRESH_MS && !olderThan(s.extensionVersion, state.version);
+  const box = $('#guide-status');
+  box.classList.toggle('ok', !!ok);
+  box.querySelector('.dot').className = `dot ${ok ? 'ok' : 'busy'}`;
+  box.querySelector('span').textContent = ok
+    ? `Connected! The SlothDJ button is ready on SoundCloud and YouTube${s.extensionVersion ? ` (extension v${s.extensionVersion})` : ''}.`
+    : 'Waiting for the extension to say hello…';
+}
+guide.addEventListener('click', async (e) => {
+  if (e.target.closest('[data-close-guide]')) return closeGuide();
+  const b = e.target.closest('[data-browser]');
+  if (b) invoke('open_extensions_page', { browser: b.dataset.browser }).catch((err) => toast(String(err), true));
+});
+$('#guide-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('#guide-path').textContent);
+    toast('Folder path copied.');
+  } catch {
+    toast('Select the path and press Ctrl+C to copy it.', true);
+  }
+});
+$('#guide-show').addEventListener('click', () => invoke('reveal_extension_folder').catch((err) => toast(String(err), true)));
+$('#s-ext').addEventListener('click', () => {
+  closeSettings();
+  openGuide();
+});
+$('#get-ext').addEventListener('click', openGuide);
 $('#s-github').addEventListener('click', (e) => {
   e.preventDefault();
   invoke('open_url', { url: REPO });
@@ -674,8 +918,8 @@ $('#folder-btn').addEventListener('click', () => invoke('open_output_dir').catch
 
 // ---------- App updates ----------
 function showUpdate(info) {
-  $('#update-title').textContent = `slothDJ ${info.version} is ready`;
-  $('#update-sub').textContent = 'Installs in a few seconds and restarts slothDJ.';
+  $('#update-title').textContent = `SlothDJ ${info.version} is ready`;
+  $('#update-sub').textContent = 'Installs in a few seconds and restarts SlothDJ.';
   $('#update-banner').hidden = false;
   $('#s-app-update').textContent = `Version ${info.version} is available`;
 }
@@ -699,7 +943,7 @@ $('#update-now').addEventListener('click', async () => {
   $('#update-sub').textContent = 'Downloading the update…';
   $('#update-banner .bar').hidden = false;
   try {
-    await invoke('install_update'); // restarts slothDJ when done
+    await invoke('install_update'); // restarts SlothDJ when done
   } catch (err) {
     $('#update-now').disabled = false;
     $('#update-banner .bar').hidden = true;
@@ -753,7 +997,10 @@ document.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
   if (e.key === 'Escape') {
-    if (!drawer.hidden) closeSettings();
+    if (!$('#remove-dialog').hidden) closeRemove();
+    else if (!$('#player').hidden) closePlayer();
+    else if (!guide.hidden) closeGuide();
+    else if (!drawer.hidden) closeSettings();
     else if (!results.hidden) closeResults();
   } else if (mod && key === ',') {
     e.preventDefault();
@@ -787,6 +1034,7 @@ async function init() {
     .map((f) => `<option value="${f.id}">${esc(f.label)}</option>`)
     .join('');
   $('#s-version').textContent = `v${s.version}`;
+  state.version = s.version;
   s.jobs.forEach((j) => state.jobs.set(j.id, j));
   renderSettings();
   renderEngine(s.engine);

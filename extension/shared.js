@@ -36,7 +36,7 @@ var SDJ = (() => {
     return null;
   }
 
-  /** Is this a page slothDJ can download? Returns { url, kind, site } or null. */
+  /** Is this a page SlothDJ can download? Returns { url, kind, site } or null. */
   function classify(href) {
     let u;
     try {

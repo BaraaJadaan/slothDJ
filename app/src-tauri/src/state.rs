@@ -23,12 +23,18 @@ pub struct Settings {
     pub last_update_check: u64,
     /// Show a system notification when a download finishes in the background.
     pub notify: bool,
-    /// Closing the window keeps slothDJ running in the tray.
+    /// Closing the window keeps SlothDJ running in the tray.
     pub close_to_tray: bool,
     /// Mirrors the OS login item; changed through `set_autostart`, not `save_settings`.
     pub start_with_system: bool,
     /// The "still running in the tray" tip has been shown once.
     pub tray_hint_shown: bool,
+    /// When the browser extension last talked to the app (ms since epoch; 0 = never).
+    pub extension_seen: u64,
+    /// The extension's version, if it reported one (versions before 1.2 don't).
+    pub extension_version: Option<String>,
+    /// What the remove button does: "ask", "list" (keep the file) or "file" (also delete it).
+    pub remove_action: String,
 }
 
 impl Default for Settings {
@@ -44,6 +50,9 @@ impl Default for Settings {
             close_to_tray: true,
             start_with_system: false,
             tray_hint_shown: false,
+            extension_seen: 0,
+            extension_version: None,
+            remove_action: "ask".into(),
         }
     }
 }
@@ -72,7 +81,7 @@ pub struct AppState {
 impl AppState {
     pub fn load(app: &AppHandle) -> Shared {
         let path = app.path();
-        let data = path.app_local_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("slothDJ"));
+        let data = path.app_local_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("SlothDJ"));
         let config = path.app_config_dir().unwrap_or_else(|_| data.clone());
         let paths = Paths {
             bin_dir: data.join("bin"),
@@ -90,7 +99,7 @@ impl AppState {
                 .or_else(|_| path.download_dir())
                 .or_else(|_| path.home_dir())
                 .unwrap_or_else(|_| PathBuf::from("."));
-            settings.output_dir = base.join("slothDJ").to_string_lossy().into_owned();
+            settings.output_dir = base.join("SlothDJ").to_string_lossy().into_owned();
         }
 
         let mut jobs: Vec<Job> = read_json(&paths.history_file).unwrap_or_default();

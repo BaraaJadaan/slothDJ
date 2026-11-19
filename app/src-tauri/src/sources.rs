@@ -1,4 +1,4 @@
-//! The sites slothDJ can download from. Each site module turns a pasted link into a
+//! The sites SlothDJ can download from. Each site module turns a pasted link into a
 //! canonical `Target` and a quick `Preview`; everything else (queue, engine) is shared.
 
 use crate::{soundcloud, youtube};
@@ -63,7 +63,7 @@ pub fn parse(input: &str) -> Result<Target, String> {
     } else if soundcloud::is_host(&host) {
         soundcloud::parse(&url, &host)
     } else {
-        Err("slothDJ supports SoundCloud and YouTube links.".into())
+        Err("SlothDJ supports SoundCloud and YouTube links.".into())
     }
 }
 

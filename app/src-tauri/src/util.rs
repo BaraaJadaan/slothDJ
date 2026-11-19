@@ -87,7 +87,8 @@ pub fn write_json<T: Serialize>(path: &Path, value: &T) {
 pub fn http() -> ureq::Agent {
     ureq::AgentBuilder::new()
         .timeout_connect(Duration::from_secs(15))
-        .timeout_read(Duration::from_secs(30))
-        .user_agent(concat!("slothDJ/", env!("CARGO_PKG_VERSION")))
+        // A connection silent this long is treated as dropped (downloads then resume).
+        .timeout_read(Duration::from_secs(15))
+        .user_agent(concat!("SlothDJ/", env!("CARGO_PKG_VERSION")))
         .build()
 }

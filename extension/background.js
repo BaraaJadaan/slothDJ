@@ -1,7 +1,9 @@
-// slothDJ extension service worker: the only part that talks to the desktop app.
+// SlothDJ extension service worker: the only part that talks to the desktop app.
 importScripts('shared.js');
 
 const PORTS = [37771, 37772, 37773, 37774, 37775];
+// Sent with status checks so the app knows the extension is installed (and stops suggesting it).
+const EXT_VERSION = chrome.runtime.getManifest().version;
 let knownPort = null;
 
 async function call(port, path, init = {}) {
@@ -15,13 +17,13 @@ async function call(port, path, init = {}) {
   }
 }
 
-/** Find the port slothDJ is listening on (it picks the first free one of five). */
+/** Find the port SlothDJ is listening on (it picks the first free one of five). */
 async function findPort() {
   const order = knownPort ? [knownPort, ...PORTS.filter((p) => p !== knownPort)] : PORTS;
   for (const port of order) {
     try {
-      const { data } = await call(port, '/api/status');
-      if (data?.app === 'slothDJ') {
+      const { data } = await call(port, `/api/status?ext=${EXT_VERSION}`);
+      if (String(data?.app).toLowerCase() === 'slothdj') {
         knownPort = port;
         return { port, status: data };
       }
@@ -82,6 +84,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
         return api(`/api/jobs/${encodeURIComponent(msg.id)}`);
       case 'cancel':
         return api(`/api/jobs/${encodeURIComponent(msg.id)}/cancel`, { method: 'POST' });
+      case 'hello':
+        // A SoundCloud/YouTube page opened: let the app know we're here (at most every few minutes).
+        if (Date.now() - lastHello > 5 * 60 * 1000) {
+          lastHello = Date.now();
+          await findPort();
+        }
+        return { ok: true };
       case 'show':
         return api('/api/show', { method: 'POST' });
       default:
@@ -101,7 +110,11 @@ const YT_LINKS = [
 ];
 const YT_PAGES = ['https://www.youtube.com/watch*', 'https://www.youtube.com/shorts/*', 'https://www.youtube.com/playlist*', 'https://music.youtube.com/*'];
 
+let lastHello = 0;
+chrome.runtime.onStartup.addListener(() => findPort());
+
 chrome.runtime.onInstalled.addListener(() => {
+  findPort();
   chrome.contextMenus.removeAll(() => {
     const add = (id, title, contexts, patterns) =>
       chrome.contextMenus.create({
@@ -110,12 +123,12 @@ chrome.runtime.onInstalled.addListener(() => {
         contexts,
         ...(contexts[0] === 'link' ? { targetUrlPatterns: patterns } : { documentUrlPatterns: patterns }),
       });
-    add('sc-link', 'Download with slothDJ', ['link'], SC_LINKS);
-    add('sc-page', 'Download this page with slothDJ', ['page'], SC_PAGES);
-    add('yt-link-audio', 'Download audio with slothDJ (MP3)', ['link'], YT_LINKS);
-    add('yt-link-video', 'Download video with slothDJ (MP4)', ['link'], YT_LINKS);
-    add('yt-page-audio', 'Download audio with slothDJ (MP3)', ['page'], YT_PAGES);
-    add('yt-page-video', 'Download video with slothDJ (MP4)', ['page'], YT_PAGES);
+    add('sc-link', 'Download with SlothDJ', ['link'], SC_LINKS);
+    add('sc-page', 'Download this page with SlothDJ', ['page'], SC_PAGES);
+    add('yt-link-audio', 'Download audio with SlothDJ (MP3)', ['link'], YT_LINKS);
+    add('yt-link-video', 'Download video with SlothDJ (MP4)', ['link'], YT_LINKS);
+    add('yt-page-audio', 'Download audio with SlothDJ (MP3)', ['page'], YT_PAGES);
+    add('yt-page-video', 'Download video with SlothDJ (MP4)', ['page'], YT_PAGES);
   });
 });
 

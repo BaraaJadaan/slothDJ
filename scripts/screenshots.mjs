@@ -77,13 +77,14 @@ const engine = setup
   : { ready: true, busy: false, stage: '', progress: 0, ytdlpVersion: '2026.10.26', ffmpeg: 'managed', js: 'node (system)', error: null };
 const handlers = {
   get_state: () => ({
-    version: '1.1.0', platform: 'windows', port: 37771, formats: FORMATS, engine,
+    version: '1.2.0', platform: 'windows', port: 37771, formats: FORMATS, engine,
     jobs: setup ? [] : JOBS,
-    settings: { outputDir: 'C:\\Users\\you\\Music\\slothDJ', format: 'mp3_320', embedArtwork: true, maxConcurrent: 2, theme: SCENE === 'light' ? 'light' : 'dark', lastUpdateCheck: 0, notify: true, closeToTray: true, startWithSystem: true, trayHintShown: true },
+    settings: { outputDir: 'C:\\Users\\you\\Music\\SlothDJ', format: 'mp3_320', embedArtwork: true, maxConcurrent: 2, theme: SCENE === 'light' ? 'light' : 'dark', lastUpdateCheck: 0, notify: true, closeToTray: true, startWithSystem: true, trayHintShown: true, extensionSeen: setup || SCENE === 'guide' ? 0 : Date.now(), extensionVersion: '1.2.0', removeAction: 'ask' },
   }),
-  check_url: ({ url }) => /youtu/.test(url) ? { url, site: 'youtube', kind: 'track' } : /soundcloud\.com/.test(url) ? { url, site: 'soundcloud', kind: 'track' } : Promise.reject('slothDJ supports SoundCloud and YouTube links.'),
+  check_url: ({ url }) => /youtu/.test(url) ? { url, site: 'youtube', kind: 'track' } : /soundcloud\.com/.test(url) ? { url, site: 'soundcloud', kind: 'track' } : Promise.reject('SlothDJ supports SoundCloud and YouTube links.'),
   preview: () => ({ url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa', site: 'youtube', kind: 'track', title: 'Night Swim (Official Video)', artist: 'Lowtide', artwork: ART.night }),
   search: () => HITS,
+  extension_setup: () => ({ folder: 'C:\\Users\\you\\AppData\\Local\\com.baraajadaan.slothdj\\browser-extension', version: '1.2.0', browsers: [{ id: 'chrome', name: 'Chrome' }, { id: 'edge', name: 'Edge' }] }),
   read_clipboard: () => null,
   save_settings: ({ settings }) => settings,
 };
@@ -104,8 +105,9 @@ addEventListener('load', () => setTimeout(() => {
     i.dispatchEvent(new Event('input'));
     document.getElementById('go').click();
   }
+  if (SCENE === 'guide') document.getElementById('get-ext').click();
   if (SCENE === 'light') {
-    document.getElementById('update-title').textContent = 'slothDJ 1.2.0 is ready';
+    document.getElementById('update-title').textContent = 'SlothDJ 1.2.0 is ready';
     document.getElementById('update-banner').hidden = false;
   }
   i.blur();
@@ -124,7 +126,7 @@ window.chrome = {
   runtime: {
     getURL: (p) => p,
     sendMessage: async (m) => m.type === 'status'
-      ? { online: true, app: 'slothDJ', version: '1.1.0', formats: FORMATS, defaultFormat: 'mp3_320' }
+      ? { online: true, app: 'slothDJ', version: '1.2.0', formats: FORMATS, defaultFormat: 'mp3_320' }
       : m.type === 'job' ? { ok: true, job: byId[m.id] } : { ok: true },
   },
   tabs: { query: async () => [{ id: 1, url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa' }], create() {}, update() {} },
@@ -157,7 +159,7 @@ function shot(url, file, w, h) {
 if (!BROWSER) throw new Error('Set BROWSER to a Chrome/Edge executable');
 const appHtml = join(root, 'app/ui/index.html');
 const appPage = page(appHtml, join(root, 'app/ui'), APP_MOCK, 'app');
-for (const scene of ['main', 'search', 'light', 'settings', 'setup']) shot(`${appPage}?scene=${scene}`, join(out, `app-${scene}.png`), 1000, 700);
+for (const scene of ['main', 'search', 'light', 'settings', 'setup', 'guide']) shot(`${appPage}?scene=${scene}`, join(out, `app-${scene}.png`), 1000, 700);
 
 const popupPage = page(join(root, 'extension/popup.html'), join(root, 'extension'), POPUP_MOCK, 'popup');
 shot(popupPage, join(out, 'extension-popup.png'), 360, 410);

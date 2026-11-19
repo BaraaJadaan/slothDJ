@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>slothDJ</title>
+  <title>SlothDJ</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
     <header class="titlebar" data-tauri-drag-region>
       <div class="brand" data-tauri-drag-region>
         <img src="logo.svg" alt="" width="22" height="22">
-        <span class="wordmark">sloth<b>DJ</b></span>
+        <span class="wordmark">Sloth<b>DJ</b></span>
       </div>
       <div class="titlebar-right">
         <button class="icon-btn" id="btn-settings" title="Settings (Ctrl+,)" aria-label="Settings" data-icon="sliders"></button>
@@ -28,8 +28,8 @@
         <div id="update-banner" class="update-banner" hidden>
           <span class="update-icon" data-icon="sparkle"></span>
           <div class="update-text">
-            <strong id="update-title">A new version of slothDJ is ready</strong>
-            <span id="update-sub">Installs in a few seconds and restarts slothDJ.</span>
+            <strong id="update-title">A new version of SlothDJ is ready</strong>
+            <span id="update-sub">Installs in a few seconds and restarts SlothDJ.</span>
             <div class="bar" hidden><div class="fill" id="update-fill"></div></div>
           </div>
           <button id="update-now" class="primary-btn small">Update now</button>
@@ -55,8 +55,9 @@
             <p id="hint" class="hint" role="status"></p>
             <div id="preview" class="preview" hidden>
               <img alt="">
-              <div class="preview-text"><strong></strong><span></span></div>
+              <div class="preview-text"><strong dir="auto"></strong><span></span></div>
               <span class="kind-pill"></span>
+              <button type="button" id="preview-play" class="play-btn" title="Preview" aria-label="Preview"><span data-icon="play"></span>Preview</button>
             </div>
             <button id="clip-chip" class="clip-chip" hidden>
               <span data-icon="clipboard"></span>
@@ -102,8 +103,8 @@
           <div id="empty" class="empty" hidden>
             <img src="logo.svg" alt="" class="empty-logo">
             <h3>Nothing here yet</h3>
-            <p>Paste a SoundCloud or YouTube link above, type a song name to search, or hit the <b>slothDJ</b> button in your browser.</p>
-            <button class="ghost-btn" id="get-ext"><span data-icon="puzzle"></span>Get the browser extension</button>
+            <p id="empty-text">Paste a SoundCloud or YouTube link above, type a song name to search, or hit the <b>SlothDJ</b> button in your browser.</p>
+            <button class="ghost-btn" id="get-ext"><span data-icon="puzzle"></span>Add the browser extension</button>
           </div>
         </section>
       </div>
@@ -143,6 +144,12 @@
           <label class="switch"><input type="checkbox" id="s-art"><span></span></label>
         </div>
         <div class="row">
+          <div><label>Remove button</label><small id="s-remove-hint">Asks each time whether to delete the file</small></div>
+          <div class="segmented" id="s-remove">
+            <button data-v="ask">Ask</button><button data-v="list">Keep file</button><button data-v="file">Delete file</button>
+          </div>
+        </div>
+        <div class="row">
           <label>Parallel downloads</label>
           <div class="segmented" id="s-parallel">
             <button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button>
@@ -151,7 +158,7 @@
 
         <h4>Background</h4>
         <div class="row">
-          <div><label for="s-tray">Keep running in the tray</label><small>Closing the window hides slothDJ, so the extension keeps working</small></div>
+          <div><label for="s-tray">Keep running in the tray</label><small>Closing the window hides SlothDJ, so the extension keeps working</small></div>
           <label class="switch"><input type="checkbox" id="s-tray"><span></span></label>
         </div>
         <div class="row">
@@ -159,7 +166,7 @@
           <label class="switch"><input type="checkbox" id="s-autostart"><span></span></label>
         </div>
         <div class="row">
-          <div><label for="s-notify">Notify when downloads finish</label><small>Only while slothDJ is in the background</small></div>
+          <div><label for="s-notify">Notify when downloads finish</label><small>Only while SlothDJ is in the background</small></div>
           <label class="switch"><input type="checkbox" id="s-notify"><span></span></label>
         </div>
 
@@ -186,24 +193,98 @@
 
         <h4>Browser extension</h4>
         <div class="row">
-          <div><label>Local port</label><small id="s-port">…</small></div>
-          <button class="ghost-btn small" id="s-ext"><span data-icon="external"></span>Get it</button>
+          <div><label id="s-ext-label">Not installed yet</label><small id="s-port">…</small></div>
+          <button class="ghost-btn small" id="s-ext"><span data-icon="puzzle"></span><span id="s-ext-btn">Set up</span></button>
         </div>
 
         <div class="about">
           <img src="logo.svg" alt="" width="40" height="40">
           <div>
-            <strong>slothDJ <span id="s-version"></span></strong>
+            <strong>SlothDJ <span id="s-version"></span></strong>
             <small id="s-app-update">Slow animal, fast downloads.</small>
           </div>
           <button class="ghost-btn small" id="s-check-app">Check for updates</button>
         </div>
-        <p class="fineprint">Only download what you have the right to keep, such as music artists offer for free, Creative Commons works, or your own uploads. <a href="#" id="s-github">slothDJ on GitHub</a></p>
+        <p class="fineprint">Only download what you have the right to keep, such as music artists offer for free, Creative Commons works, or your own uploads. <a href="#" id="s-github">SlothDJ on GitHub</a></p>
       </div>
     </aside>
   </div>
 
   <div id="drop-overlay" class="drop-overlay" hidden><div><span data-icon="download"></span>Drop to download</div></div>
+  <div id="player" class="player" hidden>
+    <div class="player-backdrop" data-close-player></div>
+    <div class="player-card" role="dialog" aria-label="Preview">
+      <header>
+        <div class="player-title"><strong dir="auto" id="player-title"></strong><span id="player-sub"></span></div>
+        <button class="icon-btn" data-close-player aria-label="Close preview" title="Close (Esc)" data-icon="x"></button>
+      </header>
+      <div class="player-stage" id="player-stage"></div>
+      <footer>
+        <span class="player-note" id="player-note"></span>
+        <button class="primary-btn small" id="player-download"><span data-icon="download"></span><span id="player-download-label">Download</span></button>
+      </footer>
+    </div>
+  </div>
+
+  <div id="remove-dialog" class="player" hidden>
+    <div class="player-backdrop" data-close-remove></div>
+    <div class="player-card remove-card" role="alertdialog" aria-labelledby="remove-title">
+      <header>
+        <div class="player-title">
+          <strong id="remove-title">Remove this download?</strong>
+          <span id="remove-name" dir="auto"></span>
+        </div>
+        <button class="icon-btn" data-close-remove aria-label="Cancel" title="Cancel (Esc)" data-icon="x"></button>
+      </header>
+      <div class="remove-body">
+        <p id="remove-explain">Deleted files go to the Recycle Bin, so you can still restore them.</p>
+        <label class="check"><input type="checkbox" id="remove-remember"><span>Remember my choice</span><small>Change it any time in Settings</small></label>
+      </div>
+      <footer>
+        <button class="ghost-btn" id="remove-list">Remove from list</button>
+        <button class="danger-btn" id="remove-file"><span data-icon="trash"></span><span id="remove-file-label">Delete file too</span></button>
+      </footer>
+    </div>
+  </div>
+
+  <div id="ext-guide" class="player" hidden>
+    <div class="player-backdrop" data-close-guide></div>
+    <div class="player-card guide-card" role="dialog" aria-labelledby="guide-title">
+      <header>
+        <div class="player-title">
+          <strong id="guide-title">Add SlothDJ to your browser</strong>
+          <span>One-time setup, about a minute. Works in Chrome, Edge, Brave, Opera and Vivaldi.</span>
+        </div>
+        <button class="icon-btn" data-close-guide aria-label="Close" title="Close (Esc)" data-icon="x"></button>
+      </header>
+      <ol class="steps">
+        <li id="guide-remove" hidden>
+          <b>Remove the old version</b>
+          <small>On your browser's extensions page (next step), click <b>Remove</b> on the old SlothDJ card. The new one updates itself together with the app.</small>
+        </li>
+        <li>
+          <b>Open your browser's extensions page</b>
+          <div class="guide-browsers" id="guide-browsers"></div>
+          <small id="guide-browsers-hint">Or type <code>chrome://extensions</code> in the address bar (<code>edge://extensions</code> in Edge).</small>
+        </li>
+        <li>
+          <b>Turn on “Developer mode”</b>
+          <small>It's a switch on that page: top right in Chrome and Brave, in the left panel in Edge.</small>
+        </li>
+        <li>
+          <b>Click “Load unpacked” and pick the SlothDJ folder</b>
+          <small>The folder's path is already copied. In the window that opens, click the address bar at the top, press <kbd>Ctrl</kbd>+<kbd>V</kbd> and <kbd>Enter</kbd>, then click <b>Select Folder</b>.</small>
+          <div class="folder-row"><code id="guide-path">…</code><button class="ghost-btn small" id="guide-copy">Copy</button><button class="ghost-btn small" id="guide-show">Show</button></div>
+        </li>
+        <li>
+          <b>Pin it</b>
+          <small>Click the puzzle-piece icon in the toolbar and pin SlothDJ. Then open any SoundCloud or YouTube page.</small>
+        </li>
+      </ol>
+      <div class="guide-status" id="guide-status"><i class="dot busy"></i><span>Waiting for the extension to say hello…</span></div>
+    </div>
+  </div>
+
   <div id="toast" class="toast" role="status"></div>
 
   <script src="app.js"></script>

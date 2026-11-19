@@ -20,7 +20,7 @@ pub fn start(app: AppHandle) {
             .iter()
             .find_map(|&p| Server::http(("127.0.0.1", p)).ok().map(|s| (s, p)))
         else {
-            eprintln!("slothDJ: no free port for the extension API");
+            eprintln!("SlothDJ: no free port for the extension API");
             return;
         };
         *lock(&state(&app).port) = Some(port);
@@ -43,6 +43,34 @@ fn origin_allowed(origin: Option<&str>) -> bool {
         Some(o) => ["chrome-extension://", "moz-extension://", "safari-web-extension://"]
             .iter()
             .any(|p| o.starts_with(p)),
+    }
+}
+
+/// Remember that the browser extension is installed (and its version, sent as `?ext=1.2.0`),
+/// so the app stops suggesting you install it.
+fn note_extension(app: &AppHandle, query: &str) {
+    let version = url::form_urlencoded::parse(query.as_bytes())
+        .find(|(k, _)| k == "ext")
+        .map(|(_, v)| v.chars().filter(|c| c.is_ascii_digit() || *c == '.').take(20).collect::<String>())
+        .filter(|v| !v.is_empty());
+    let st = state(app);
+    let now = crate::util::now_ms();
+    let changed = {
+        let mut s = lock(&st.settings);
+        let stale = now.saturating_sub(s.extension_seen) > 60_000;
+        let new_version = version.is_some() && version != s.extension_version;
+        if stale || new_version {
+            s.extension_seen = now;
+            if version.is_some() {
+                s.extension_version = version;
+            }
+        }
+        stale || new_version
+    };
+    if changed {
+        st.save_settings();
+        let s = lock(&st.settings).clone();
+        let _ = app.emit("settings", &s);
     }
 }
 
@@ -79,8 +107,17 @@ fn handle(app: &AppHandle, port: u16, mut req: Request) {
     }
 
     let method = req.method().clone();
-    let path = req.url().split('?').next().unwrap_or("").to_string();
+    let (path, query) = match req.url().split_once('?') {
+        Some((p, q)) => (p.to_string(), q.to_string()),
+        None => (req.url().to_string(), String::new()),
+    };
     let st = state(app);
+    // Browsers don't send an Origin header on an extension's plain GET requests, so the
+    // `?ext=` tag the extension adds counts too. Web pages were already refused above.
+    let from_extension = origin.as_deref().is_some_and(|o| o.contains("-extension://"));
+    if from_extension || query.split('&').any(|kv| kv.starts_with("ext=")) {
+        note_extension(app, &query);
+    }
 
     match (method, path.as_str()) {
         (Method::Options, _) => reply(req, 204, json!({})),

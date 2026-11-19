@@ -71,6 +71,33 @@ pub fn check_url(url: String) -> Result<LinkInfo, String> {
     sources::parse(&url).map(|t| LinkInfo { url: t.url, site: t.site, kind: t.kind })
 }
 
+/// Prepare the extension folder for "Load unpacked", copy its path, and list browsers we can open.
+#[tauri::command]
+pub fn extension_setup(app: AppHandle) -> Result<crate::extension::Setup, String> {
+    let setup = crate::extension::setup(&app)?;
+    let _ = app.clipboard().write_text(setup.folder.clone());
+    Ok(setup)
+}
+
+#[tauri::command]
+pub fn open_extensions_page(browser: String) -> Result<(), String> {
+    crate::extension::open_extensions_page(&browser)
+}
+
+#[tauri::command]
+pub fn reveal_extension_folder(app: AppHandle) -> Result<(), String> {
+    let dir = crate::extension::folder(&app);
+    app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| e.to_string())
+}
+
+/// Something playable for a link: a small YouTube stream or SoundCloud's embedded player.
+#[tauri::command]
+pub async fn preview_stream(app: AppHandle, url: String) -> Result<crate::stream::Stream, String> {
+    tauri::async_runtime::spawn_blocking(move || crate::stream::preview_stream(&app, &url))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn search(app: AppHandle, query: String) -> Result<Vec<Hit>, String> {
     tauri::async_runtime::spawn_blocking(move || search::search(&app, &query))
@@ -88,9 +115,16 @@ pub fn retry_job(app: AppHandle, id: u64) {
     jobs::retry(&app, id);
 }
 
+/// Remove from the list; with `delete_files`, also move the downloaded file(s) to the Recycle Bin.
+/// Returns how many files were deleted.
 #[tauri::command]
-pub fn remove_job(app: AppHandle, id: u64) {
-    jobs::remove(&app, id);
+pub fn remove_job(app: AppHandle, id: u64, delete_files: Option<bool>) -> Result<usize, String> {
+    if delete_files.unwrap_or(false) {
+        jobs::delete_with_files(&app, id)
+    } else {
+        jobs::remove(&app, id);
+        Ok(0)
+    }
 }
 
 #[tauri::command]
@@ -145,7 +179,7 @@ pub async fn pick_output_dir(app: AppHandle) -> Result<Settings, String> {
     let picked = app
         .dialog()
         .file()
-        .set_title("Choose where slothDJ saves downloads")
+        .set_title("Choose where SlothDJ saves downloads")
         .set_directory(&current)
         .blocking_pick_folder()
         .and_then(|p| p.into_path().ok());
@@ -173,6 +207,13 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Settings {
             last_update_check: s.last_update_check,
             start_with_system: s.start_with_system,
             tray_hint_shown: s.tray_hint_shown,
+            extension_seen: s.extension_seen,
+            extension_version: s.extension_version.clone(),
+            remove_action: if ["ask", "list", "file"].contains(&settings.remove_action.as_str()) {
+                settings.remove_action.clone()
+            } else {
+                s.remove_action.clone()
+            },
             ..settings
         };
         s.clone()
@@ -228,7 +269,7 @@ pub struct UpdateInfo {
     notes: Option<String>,
 }
 
-/// Ask GitHub whether a newer slothDJ exists. Remembers it for `install_update`.
+/// Ask GitHub whether a newer SlothDJ exists. Remembers it for `install_update`.
 #[tauri::command]
 pub async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>, String> {
     use tauri_plugin_updater::UpdaterExt;
@@ -243,7 +284,7 @@ pub async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>, String> 
     Ok(info)
 }
 
-/// Download the update found by `check_update`, install it and restart slothDJ.
+/// Download the update found by `check_update`, install it and restart SlothDJ.
 #[tauri::command]
 pub async fn install_update(app: AppHandle) -> Result<(), String> {
     let Some(update) = lock(&state(&app).update).take() else {

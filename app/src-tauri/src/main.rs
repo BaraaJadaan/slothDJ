@@ -1,14 +1,16 @@
-// slothDJ: slow animal, fast downloads.
+// SlothDJ: slow animal, fast downloads.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
 mod engine;
+mod extension;
 mod jobs;
 mod search;
 mod server;
 mod soundcloud;
 mod sources;
 mod state;
+mod stream;
 mod util;
 mod youtube;
 
@@ -54,13 +56,13 @@ fn handle_link(app: &AppHandle, link: &str) {
 }
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open slothDJ", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Open SlothDJ", true, None::<&str>)?;
     let folder = MenuItem::with_id(app, "folder", "Open download folder", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
-    let quit_item = MenuItem::with_id(app, "quit", "Quit slothDJ", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", "Quit SlothDJ", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &folder, &sep, &quit_item])?;
     let mut tray = TrayIconBuilder::with_id("main")
-        .tooltip("slothDJ")
+        .tooltip("SlothDJ")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -83,7 +85,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Look for a new slothDJ a few seconds after launch, then every six hours.
+/// Look for a new SlothDJ a few seconds after launch, then every six hours.
 fn start_update_checks(app: AppHandle) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(8));
@@ -124,7 +126,7 @@ fn main() {
             // don't hijack an installed copy's links.
             #[cfg(all(any(windows, target_os = "linux"), not(debug_assertions)))]
             if let Err(e) = app.deep_link().register_all() {
-                eprintln!("slothDJ: couldn't register slothdj:// links: {e}");
+                eprintln!("SlothDJ: couldn't register slothdj:// links: {e}");
             }
             let h = handle.clone();
             app.deep_link().on_open_url(move |event| {
@@ -147,6 +149,8 @@ fn main() {
                 show_main(&handle);
             }
 
+            // If the browser extension was set up from SlothDJ, keep it in step with this version.
+            extension::refresh_if_set_up(&handle);
             server::start(handle.clone());
             engine::ensure(handle.clone(), false);
             start_update_checks(handle);
@@ -160,7 +164,7 @@ fn main() {
                 if to_tray && !QUITTING.load(Ordering::SeqCst) {
                     api.prevent_close();
                     let _ = window.hide();
-                    // The first time, say where slothDJ went.
+                    // The first time, say where SlothDJ went.
                     let first = !std::mem::replace(&mut lock(&st.settings).tray_hint_shown, true);
                     if first {
                         st.save_settings();
@@ -168,7 +172,7 @@ fn main() {
                         let _ = app
                             .notification()
                             .builder()
-                            .title("slothDJ is still running")
+                            .title("SlothDJ is still running")
                             .body("It keeps working in the tray so the browser extension can reach it. Right-click the sloth icon to quit.")
                             .show();
                     }
@@ -181,6 +185,10 @@ fn main() {
             commands::preview,
             commands::check_url,
             commands::search,
+            commands::preview_stream,
+            commands::extension_setup,
+            commands::open_extensions_page,
+            commands::reveal_extension_folder,
             commands::cancel_job,
             commands::retry_job,
             commands::remove_job,
@@ -199,7 +207,7 @@ fn main() {
             commands::install_update,
         ])
         .build(tauri::generate_context!())
-        .expect("error while starting slothDJ");
+        .expect("error while starting SlothDJ");
 
     app.run(|app, event| match event {
         RunEvent::Exit => {

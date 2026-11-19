@@ -1,4 +1,4 @@
-// Adds a slothDJ button on SoundCloud (next to Like/Repost/Share) and YouTube (under the video), plus a small progress toast.
+// Adds a SlothDJ button on SoundCloud (next to Like/Repost/Share) and YouTube (under the video), plus a small progress toast.
 (() => {
   if (window.__slothdj) return;
   window.__slothdj = true;
@@ -81,20 +81,21 @@
   }).observe(document.body, { childList: true, subtree: true });
   document.addEventListener('yt-navigate-finish', () => setTimeout(scan, 50));
   scan();
+  send({ type: 'hello' });
 
   // ---------- Job tracking ----------
   function paint(b, job) {
     let state = 'idle';
     let label = '';
-    let title = 'Download with slothDJ';
+    let title = 'Download with SlothDJ';
     if (job) {
       switch (job.status) {
-        case 'sending': state = 'busy'; label = 'Sending'; title = 'Sending to slothDJ…'; break;
+        case 'sending': state = 'busy'; label = 'Sending'; title = 'Sending to SlothDJ…'; break;
         case 'queued':
-        case 'starting': state = 'busy'; label = 'Queued'; title = 'Queued in slothDJ'; break;
+        case 'starting': state = 'busy'; label = 'Queued'; title = 'Queued in SlothDJ'; break;
         case 'downloading': state = 'busy'; label = `${Math.round(job.progress * 100)}%`; title = `Downloading: ${job.title}`; break;
         case 'converting': state = 'busy'; label = job.format?.startsWith('mp4_') ? 'Merging…' : 'MP3…'; title = 'Finishing up…'; break;
-        case 'done': state = 'done'; title = `Saved by slothDJ: ${job.title}`; break;
+        case 'done': state = 'done'; title = `Saved by SlothDJ: ${job.title}`; break;
         case 'failed': state = 'error'; title = job.error || 'Download failed'; break;
         default: break;
       }
@@ -106,9 +107,9 @@
     const l = b.querySelector('.sdj-label');
     if (b.classList.contains('sdj-yt-btn')) {
       // YouTube's buttons carry text labels, so ours always does too.
-      l.textContent = label || { done: 'Saved', error: 'Failed' }[state] || 'slothDJ';
+      l.textContent = label || { done: 'Saved', error: 'Failed' }[state] || 'SlothDJ';
     } else {
-      l.textContent = label || 'slothDJ';
+      l.textContent = label || 'SlothDJ';
       l.classList.toggle('sc-visuallyhidden', !label);
       b.classList.toggle('sdj-wide', !!label);
     }
@@ -211,7 +212,7 @@
       </style>
       <div class="card" role="status">
         <img alt="" src="${chrome.runtime.getURL('icons/logo.svg')}">
-        <div><div class="t"></div><div class="s"></div></div>
+        <div><div class="t" dir="auto"></div><div class="s" dir="auto"></div></div>
         <button class="x" aria-label="Close">×</button>
         <div class="bar" hidden><div class="fill"></div></div>
         <div class="acts" hidden></div>
@@ -254,7 +255,7 @@
     const name = [job.title, job.artist].filter(Boolean).join(' · ');
     switch (job.status) {
       case 'done':
-        return toast({ title: 'Saved ✓', sub: name, autoHide: 3500, actions: [{ label: 'Show in slothDJ', onClick: () => send({ type: 'show' }) }] });
+        return toast({ title: 'Saved ✓', sub: name, autoHide: 3500, actions: [{ label: 'Show in SlothDJ', onClick: () => send({ type: 'show' }) }] });
       case 'failed':
         return toast({ tone: 'err', title: 'Download failed', sub: job.error || name, autoHide: 6000 });
       case 'canceled':
@@ -269,7 +270,7 @@
       case 'converting':
         return toast({ title: 'Converting…', sub: name, progress: job.progress, actions: [cancelAction(job)] });
       default:
-        return toast({ title: 'Sent to slothDJ', sub: name, progress: 0, actions: [cancelAction(job)] });
+        return toast({ title: 'Sent to SlothDJ', sub: name, progress: 0, actions: [cancelAction(job)] });
     }
   }
 
@@ -282,15 +283,15 @@
     const format = (await chrome.storage.sync.get(key))[key];
     toast({
       tone: 'err',
-      title: 'slothDJ isn’t running',
+      title: 'SlothDJ isn’t running',
       sub: 'Open the app and this download starts right away.',
       actions: [
         {
-          label: 'Open slothDJ',
+          label: 'Open SlothDJ',
           primary: true,
           onClick: () => {
             location.href = SDJ.deepLink(url, format);
-            toast({ title: 'Opening slothDJ…', sub: 'Your download starts in the app.', autoHide: 4000 });
+            toast({ title: 'Opening SlothDJ…', sub: 'Your download starts in the app.', autoHide: 4000 });
           },
         },
         { label: 'Get the app', onClick: () => window.open(`${SDJ.REPO}/releases/latest`, '_blank', 'noopener') },

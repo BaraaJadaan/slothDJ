@@ -1,4 +1,4 @@
-/* slothDJ — dark-first, follows the system theme unless overridden in Settings. */
+/* SlothDJ — dark-first, follows the system theme unless overridden in Settings. */
 :root {
   color-scheme: dark;
   --bg: #0e0b16;
@@ -386,3 +386,74 @@ svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
 .fineprint a { color: var(--muted); }
 .fineprint a:hover { color: var(--text); }
 .preview img.wide { width: 64px; height: 36px; }
+
+/* ---------- v1.2: previews, right-to-left text ---------- */
+/* Each piece of a status line is isolated, so Arabic/Hebrew titles don't reorder the numbers around them. */
+bdi { unicode-bidi: isolate; }
+.job-title strong, .hit-text strong, .preview-text strong, .player-title strong { unicode-bidi: plaintext; text-align: start; }
+
+.play-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px 0 9px; border-radius: 99px;
+  font-size: 12px; font-weight: 600; color: var(--text); background: var(--track); border: 1px solid var(--line);
+}
+.play-btn:hover { background: var(--card-hover); border-color: var(--line-strong); }
+.play-btn svg.i { width: 12px; height: 12px; fill: currentColor; }
+.hit-actions { display: flex; gap: 6px; }
+
+.player { position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; padding: 24px; }
+.player-backdrop { position: absolute; inset: 0; background: rgba(5, 3, 10, 0.62); backdrop-filter: blur(4px); animation: fade 0.18s ease-out; }
+.player-card {
+  position: relative; width: min(720px, 100%); border-radius: 18px; overflow: hidden;
+  background: var(--bg-2); border: 1px solid var(--line-strong); box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+  animation: rise 0.2s ease-out;
+}
+.player-card header { display: flex; align-items: flex-start; gap: 12px; padding: 14px 12px 12px 18px; }
+.player-title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.player-title strong { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-title span { font-size: 12.5px; color: var(--muted); }
+.player-stage { position: relative; aspect-ratio: 16 / 9; background: #000; display: grid; place-items: center; overflow: hidden; }
+.player-stage.widget { aspect-ratio: auto; height: 300px; background: var(--card); }
+.player-stage video, .player-stage iframe { width: 100%; height: 100%; border: 0; display: block; background: #000; }
+.player-stage .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(18px) brightness(0.5); transform: scale(1.1); }
+.player-stage .loading { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; color: #f4f1fa; font-size: 13px; text-align: center; padding: 0 24px; }
+.player-stage .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.2); border-top-color: #ec4899; animation: spin 0.8s linear infinite; }
+.player-stage .loading.err { color: var(--err); }
+.player-card footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px 14px 18px; }
+.player-note { font-size: 12px; color: var(--muted); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Extension setup guide */
+.guide-card { width: min(600px, 100%); }
+.steps { margin: 0; padding: 4px 22px 6px 46px; counter-reset: step; list-style: none; }
+.steps li { position: relative; padding: 10px 0 12px; border-bottom: 1px solid var(--line); counter-increment: step; }
+.steps li:last-child { border-bottom: 0; }
+.steps li::before {
+  content: counter(step); position: absolute; left: -32px; top: 9px; width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; background: var(--grad);
+}
+.steps li[hidden] { display: none; }
+.steps b { display: block; font-weight: 650; margin-bottom: 3px; }
+.steps small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.steps small b { display: inline; color: var(--text); }
+.steps code { font: 12px ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--track); padding: 1px 6px; border-radius: 5px; }
+.steps kbd { font: 11px ui-monospace, Consolas, monospace; background: var(--track); border: 1px solid var(--line-strong); border-bottom-width: 2px; padding: 0 5px; border-radius: 4px; }
+.steps .folder-row { margin-top: 8px; }
+.guide-browsers { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+.guide-browsers:empty { display: none; }
+.guide-status { display: flex; align-items: center; gap: 10px; margin: 0 14px 14px; padding: 10px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.guide-status.ok { color: var(--ok); border-color: rgba(52, 211, 153, 0.4); background: rgba(52, 211, 153, 0.08); }
+
+/* Remove dialog */
+.remove-card { width: min(460px, 100%); }
+.remove-body { padding: 0 18px 4px; }
+.remove-body p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.check { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 10px; cursor: pointer; }
+.check input { width: 16px; height: 16px; accent-color: #d946ef; margin: 0; }
+.check small { grid-column: 2; color: var(--faint); font-size: 11.5px; }
+.danger-btn {
+  display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 10px;
+  background: rgba(248, 113, 113, 0.14); color: var(--err); border: 1px solid rgba(248, 113, 113, 0.4); font-weight: 600;
+}
+.danger-btn:hover { background: rgba(248, 113, 113, 0.22); }
+.danger-btn svg.i { width: 15px; height: 15px; }
+.remove-card footer { justify-content: flex-end; }
