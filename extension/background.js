@@ -57,12 +57,14 @@ async function catchUp(status) {
  * by itself (from 1.3.0 on; 1.2's buttons can't be replaced, so those tabs need a reload).
  */
 async function refreshOpenTabs(again = true) {
-  const { matches, js, css } = chrome.runtime.getManifest().content_scripts[0];
-  for (const tab of await chrome.tabs.query({ url: matches })) {
-    const target = { tabId: tab.id };
-    // Running it twice is harmless: a page that already has this copy ignores the second.
-    if (again) chrome.scripting.insertCSS({ target, files: css }).catch(() => {});
-    chrome.scripting.executeScript({ target, files: js }).catch(() => {});
+  for (const { matches, js, css, all_frames: allFrames } of chrome.runtime.getManifest().content_scripts) {
+    for (const tab of await chrome.tabs.query({ url: matches })) {
+      // SoundCloud shows its newer pages in a frame, so it gets every frame.
+      const target = { tabId: tab.id, allFrames: !!allFrames };
+      // Running it twice is harmless: a page that already has this copy ignores the second.
+      if (again) chrome.scripting.insertCSS({ target, files: css }).catch(() => {});
+      chrome.scripting.executeScript({ target, files: js }).catch(() => {});
+    }
   }
   // A tab that was still loading during the reload can miss the first pass.
   if (again) setTimeout(() => refreshOpenTabs(false), 3000);
@@ -187,7 +189,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const url = id.includes('-link') ? info.linkUrl : info.pageUrl;
   if (!SDJ.classify(url)) return flashBadge('?', '#6f6884');
   const res = await download(url, await formatForMenu(id, url));
-  if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: 'sent', url, res }).catch(() => {});
+  // Only the frame that was right-clicked shows the result (SoundCloud pages can have two).
+  if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: 'sent', url, res }, { frameId: info.frameId ?? 0 }).catch(() => {});
   if (res.ok) flashBadge('✓', '#34d399');
   else flashBadge(res.offline ? 'off' : '!', '#f87171');
 });

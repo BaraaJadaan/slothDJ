@@ -33,10 +33,14 @@ pub fn parse(url: &url::Url, host: &str) -> Result<Target, String> {
         // Short share link: resolved to a full URL just before downloading.
         return Ok(target(format!("https://on.soundcloud.com{}", url.path()), Kind::Track));
     }
-    let segs: Vec<&str> = url
+    let mut segs: Vec<&str> = url
         .path_segments()
         .map(|s| s.filter(|x| !x.is_empty()).collect())
         .unwrap_or_default();
+    // SoundCloud's newer pages live under /n/ (/n/artist/track): the same sound as /artist/track.
+    if segs.len() > 1 && segs[0] == "n" {
+        segs.remove(0);
+    }
     let Some(first) = segs.first().map(|s| s.to_ascii_lowercase()) else {
         return Err("Paste a link to a track, set or profile.".into());
     };
@@ -113,6 +117,11 @@ mod tests {
 
         let t = parse("soundcloud.com/forss/sets/soulhack").unwrap();
         assert_eq!(t.kind, Kind::Set);
+
+        // The newer SoundCloud pages put /n/ in front.
+        let t = parse("https://soundcloud.com/n/forss/flickermood").unwrap();
+        assert_eq!(t.kind, Kind::Track);
+        assert_eq!(t.url, "https://soundcloud.com/forss/flickermood");
 
         let t = parse("https://m.soundcloud.com/forss").unwrap();
         assert_eq!((t.kind, t.url.as_str()), (Kind::Profile, "https://soundcloud.com/forss/tracks"));

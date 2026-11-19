@@ -185,6 +185,50 @@
     });
   }
 
+  // SoundCloud's newer track and playlist page (what signed-in listeners get; it runs in a
+  // frame under /n/): a row of round buttons (Share, Copy link, Repost, Add to playlist,
+  // More) beside the comment box. The SlothDJ button goes first in that row.
+  const isRound = (el) => el.matches('button.MuiIconButton-root') || !!el.querySelector(':scope > button.MuiIconButton-root');
+  function newSoundCloudBar() {
+    const main = document.querySelector('main');
+    if (!main) return null;
+    const byLabel = main.querySelector('button[aria-label="Copy link"]')?.parentElement;
+    if (byLabel) return byLabel;
+    // SoundCloud in another language: the first row of four or more round buttons.
+    for (const b of main.querySelectorAll('button.MuiIconButton-root')) {
+      for (const row of [b.parentElement, b.parentElement?.parentElement]) {
+        if (row && [...row.children].filter(isRound).length >= 4) return row;
+      }
+    }
+    return null;
+  }
+
+  function scanNewSoundCloud() {
+    const page = SDJ.classify(location.href);
+    if (!page || (page.kind !== 'track' && page.kind !== 'set')) return;
+    const bar = newSoundCloudBar();
+    if (!bar) return;
+    let el = bar.querySelector(':scope > .sdjx');
+    if (el && stale(el)) {
+      el.remove();
+      el = null;
+    }
+    if (!el) {
+      el = makeSplit(page.url, 'scn');
+      bar.prepend(el);
+    } else if (el.dataset.key !== page.url) {
+      point(el, page.url);
+      closeMenu();
+    }
+    // Match the round buttons beside it, whose colours follow the artwork behind them.
+    const twin = bar.querySelector('button.MuiIconButton-root');
+    if (twin) {
+      const cs = getComputedStyle(twin);
+      el.style.color = cs.color;
+      el.style.backgroundColor = cs.backgroundColor;
+    }
+  }
+
   // YouTube: one button under the video, next to Like and Share. YouTube is a single-page
   // app, so the same button is re-aimed when you open another video.
   function scanYouTube() {
@@ -207,7 +251,12 @@
 
   let retired = false;
   // A copy cut off by an update adds no new buttons; the ones it has say "reload the page".
-  const scan = () => !retired && alive() && (site === 'youtube' ? scanYouTube : scanSoundCloud)();
+  const scan = () => {
+    if (retired || !alive()) return;
+    if (site === 'youtube') return scanYouTube();
+    scanSoundCloud();
+    scanNewSoundCloud();
+  };
   let scanTimer;
   const observer = new MutationObserver(() => {
     clearTimeout(scanTimer);

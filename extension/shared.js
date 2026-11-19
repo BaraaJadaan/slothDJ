@@ -11,7 +11,9 @@ var SDJ = (() => {
 
   function soundcloud(u, host) {
     if (host === 'on.soundcloud.com') return { url: u.origin + u.pathname, kind: 'track', site: 'soundcloud' };
-    const segs = u.pathname.split('/').filter(Boolean);
+    let segs = u.pathname.split('/').filter(Boolean);
+    // SoundCloud's newer pages live under /n/ (/n/artist/track): the same sound as /artist/track.
+    if (segs[0] === 'n' && segs.length > 1) segs = segs.slice(1);
     if (!segs.length) return null;
     const first = segs[0].toLowerCase();
     if (RESERVED.has(first) && !(first === 'discover' && segs[1] === 'sets' && segs.length >= 3)) return null;
